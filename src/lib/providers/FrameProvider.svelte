@@ -30,7 +30,7 @@
 			}
 			const { nonce } = await csrf.json();
 			const signInResult = await sdk.actions.signIn({ nonce, acceptAuthAddress: true });
-			const login = await fetch('/api/auth/login', {
+			const login = await fetch('/api/auth/siwf', {
 				method: 'POST',
 				body: JSON.stringify({
 					message: signInResult.message,

@@ -24,7 +24,7 @@ export const PATCH = async ({ request, locals }) => {
 
 	db.update(schema.user)
 		.set({
-			notificationDetails: JSON.stringify({ token, url })
+			notificationDetails: JSON.stringify({ token: token, url: url })
 		})
 		.where(eq(schema.user.id, user.id))
 		.run();
