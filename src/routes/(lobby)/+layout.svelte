@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Nav from '$lib/Nav.svelte';
+	import Nav from '$lib/ui/Nav.svelte';
 	const FrameProvider = import('$lib/providers/FrameProvider.svelte');
 	let { children } = $props();
 </script>

@@ -1,0 +1,32 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Farkle is a dice game of chance and strategy played with six dice and two or more players. The objective is to be the first player to reach or exceed 10,000 points.
+
+Basic Gameplay Rules
+- Each player takes turns rolling all six dice at once.
+- After each roll, the player must set aside at least one scoring die or combination of dice.
+- The player can then either end their turn and bank the points accumulated during that turn or continue rolling the remaining dice to try to increase their score.
+- If the player scores with all six dice in a turn (called "hot dice"), they may roll all six dice again and continue accumulating points.
+- If a roll results in no scoring dice ("farkle"), the player loses all points accumulated during that turn, and the turn passes to the next player.
+- The game continues with players accumulating points over multiple turns until one player reaches or exceeds 10,000 points.
+- After a player reaches 10,000 points, other players have one last turn to try to surpass that score.
+
+Scoring
+- Single 1s are worth 100 points.
+- Single 5s are worth 50 points.
+- Three of a kind (numbers 2-6) score 100 times the number (e.g., three 4s = 400 points).
+- Three 1s score 1,000 points.
+- 4 of a Kind – Take the score of three of a kind and multiply it by 2.
+- 5 of a Kind – Take the score of three of a kind and multiply it by 3.
+- 6 of a Kind – Take the score of three of a kind and multiply it by 4.
+- A straight (1-6) scores 1,500 points.
+- Three pairs score 1,500 points.
+- Four of a kind plus a pair scores 1,500 points.
+- Two sets of three of a kind score 2,500 points.
+
+Players must score points from dice in the current roll only; dice from previous rolls in the same turn cannot be combined to form new scoring combinations.
+
+This summary covers the most common and official rules, but many house rules and scoring variations exist across different groups and regions.

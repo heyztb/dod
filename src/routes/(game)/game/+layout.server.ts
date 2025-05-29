@@ -1,8 +1,7 @@
-import { validateSession } from '$lib/server/auth';
 import { redirect } from '@sveltejs/kit';
 
-export async function load({ cookies }) {
-	const { session, user } = await validateSession(cookies.get('dod.ztb.dev-session-token') ?? '');
+export async function load({ locals }) {
+	const { session, user } = locals;
 	if (!session) {
 		console.log('No session');
 		return redirect(302, '/');

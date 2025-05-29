@@ -21,7 +21,8 @@ export async function POST({ request, cookies }) {
 		message,
 		signature,
 		nonce,
-		domain: getDomainFromUrl(request.url)
+		domain: getDomainFromUrl(request.url),
+		acceptAuthAddress: true
 	});
 	const { success, fid, error } = verifyResponse;
 	console.log('verifySignInMessage', { success, fid, error });

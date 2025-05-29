@@ -6,7 +6,9 @@
 	import { frameContext } from '$lib/stores';
 	import { getLogger } from '@logtape/logtape';
 
-	const logger = getLogger(['frontend', 'FrameProvider']);
+	export const ssr = false;
+
+	const logger = getLogger(['frontend', 'frame']);
 	const { children } = $props();
 
 	onMount(async () => {

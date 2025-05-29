@@ -1,84 +1,73 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { frameContext } from '$lib/stores';
+	import { Book } from 'lucide-svelte';
+	import Modal from '$lib/ui/Modal.svelte';
+
+	let showRulesModal = $state(false);
 </script>
 
 <div class="container mx-auto p-4">
-	<h1 class="mb-4 text-3xl font-bold">Welcome {$frameContext?.user?.displayName || ''}</h1>
-	<p class="mb-4">
-		Visit <a href="https://svelte.dev/docs/kit" class="text-blue-500 hover:underline"
-			>svelte.dev/docs/kit</a
-		> to read the documentation
-	</p>
+	<div class="mb-6 flex items-center justify-between">
+		<h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">
+			Welcome {$frameContext?.user?.displayName || ''}
+		</h1>
 
-	<div class="rounded-lg bg-gray-100 p-4">
-		<h2 class="mb-4 text-2xl font-semibold">Frame Context</h2>
+		<!-- Rules button -->
+		<button
+			type="button"
+			class="btn preset-outlined-neutral-200-800 flex items-center gap-2 border border-gray-300 bg-white p-3 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+			onclick={() => (showRulesModal = true)}
+			aria-label="View game rules"
+		>
+			<Book size={20} />
+			<span class="hidden sm:inline">Rules</span>
+		</button>
+	</div>
 
-		{#if $frameContext}
-			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-				<!-- User Section -->
-				<div class="rounded bg-white p-4 shadow">
-					<h3 class="mb-2 text-lg font-bold">User</h3>
-					{#if $frameContext.user}
-						<div class="mb-3 flex items-center gap-3">
-							{#if $frameContext.user.pfpUrl}
-								<img src={$frameContext.user.pfpUrl} alt="Profile" class="h-12 w-12 rounded-full" />
-							{/if}
-							<div>
-								<p class="font-bold">{$frameContext.user.displayName || ''}</p>
-								<p class="text-gray-600">@{$frameContext.user.username || ''}</p>
-							</div>
-						</div>
-						<div class="space-y-1">
-							<p><span class="font-semibold">FID:</span> {$frameContext.user.fid}</p>
-							{#if $frameContext.user.location?.description}
-								<p>
-									<span class="font-semibold">Location:</span>
-									{$frameContext.user.location.description}
-								</p>
-							{/if}
-						</div>
-					{:else}
-						<p>No user data available</p>
-					{/if}
-				</div>
-
-				<!-- Location Section -->
-				<div class="rounded bg-white p-4 shadow">
-					<h3 class="mb-2 text-lg font-bold">Location</h3>
-					{#if $frameContext.location}
-						<p><span class="font-semibold">Type:</span> {$frameContext.location.type}</p>
-					{:else}
-						<p>No location data available</p>
-					{/if}
-				</div>
-
-				<!-- Client Section -->
-				<div class="rounded bg-white p-4 shadow">
-					<h3 class="mb-2 text-lg font-bold">Client</h3>
-					{#if $frameContext.client}
-						<p><span class="font-semibold">Client FID:</span> {$frameContext.client.clientFid}</p>
-						<p>
-							<span class="font-semibold">Added:</span>
-							{$frameContext.client.added ? 'Yes' : 'No'}
-						</p>
-					{:else}
-						<p>No client data available</p>
-					{/if}
-				</div>
-			</div>
-
-			<details class="mt-4">
-				<summary class="cursor-pointer text-sm text-gray-600">Show raw JSON</summary>
-				<pre
-					class="mt-2 overflow-x-auto rounded bg-gray-800 p-2 text-xs text-white">{JSON.stringify(
-						$frameContext,
-						null,
-						2
-					)}</pre>
-			</details>
-		{:else}
-			<p>No frame context available</p>
-		{/if}
+	<!-- Main content area -->
+	<div class="rounded-lg bg-gray-100 p-6 dark:bg-gray-800">
+		<h2 class="mb-4 text-2xl font-semibold text-gray-900 dark:text-gray-100">Ready to Play?</h2>
+		<p class="text-lg text-gray-700 dark:text-gray-300">
+			Roll six dice to score points. First to 10,000, or highest score wins!
+		</p>
 	</div>
 </div>
+
+<!-- Rules Modal -->
+<Modal bind:open={showRulesModal} title="Farkle Rules">
+	<div class="space-y-6">
+		<p class="text-lg text-gray-700 dark:text-gray-300">
+			Roll six dice to score points. First to 10,000, or highest score wins!
+		</p>
+
+		<div class="grid gap-6 md:grid-cols-2">
+			<div>
+				<h3 class="mb-3 text-xl font-semibold text-gray-900 dark:text-gray-100">How to Play</h3>
+				<ul class="list-disc space-y-2 pl-5 text-gray-700 dark:text-gray-300">
+					<li>Roll all six dice</li>
+					<li>Set aside scoring dice</li>
+					<li>Roll remaining dice or bank points</li>
+					<li>No scoring dice = "Farkle" (lose turn points)</li>
+					<li>Score all six dice = roll again</li>
+					<li>
+						After a player reaches 10,000 points, other players have one last turn to try to surpass
+						their score
+					</li>
+				</ul>
+			</div>
+
+			<div>
+				<h3 class="mb-3 text-xl font-semibold text-gray-900 dark:text-gray-100">Scoring</h3>
+				<ul class="list-disc space-y-1 pl-5 text-sm text-gray-700 dark:text-gray-300">
+					<li>Single 1 = 100 points</li>
+					<li>Single 5 = 50 points</li>
+					<li>Three 1s = 1,000 points</li>
+					<li>Three of a kind = 100 × number</li>
+					<li>Straight (1-6) = 1,500 points</li>
+					<li>Three pairs = 1,500 points</li>
+				</ul>
+			</div>
+		</div>
+	</div>
+</Modal>
