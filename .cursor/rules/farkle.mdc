@@ -19,9 +19,9 @@ Scoring
 - Single 5s are worth 50 points.
 - Three of a kind (numbers 2-6) score 100 times the number (e.g., three 4s = 400 points).
 - Three 1s score 1,000 points.
-- 4 of a Kind – Take the score of three of a kind and multiply it by 2.
-- 5 of a Kind – Take the score of three of a kind and multiply it by 3.
-- 6 of a Kind – Take the score of three of a kind and multiply it by 4.
+- 4 of a Kind – 1000 points.
+- 5 of a Kind – 2000 points.
+- 6 of a Kind – 3000 points.
 - A straight (1-6) scores 1,500 points.
 - Three pairs score 1,500 points.
 - Four of a kind plus a pair scores 1,500 points.
