@@ -91,7 +91,7 @@ const id = (): Handle => {
 		const response = await resolve(event);
 		response.headers.set('x-request-id', id);
 		return response;
-	}
-}
+	};
+};
 
 export const handle = sequence(id(), auth());

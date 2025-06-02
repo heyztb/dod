@@ -10,3 +10,32 @@ export const getDomainFromUrl = (url: string) => {
 export const cn = (...classes: ClassValue[]) => {
 	return twMerge(clsx(classes));
 };
+
+// Viem hooks
+export {
+	useViem,
+	usePublicClient,
+	useWalletClient,
+	useAccount,
+	useChain,
+	useSwitchChain,
+	useViemState
+} from './hooks/useViem.js';
+
+// Viem stores
+export {
+	viemStore,
+	publicClient,
+	walletClient,
+	address,
+	chainId,
+	isConnected
+} from './stores/viem.js';
+
+// Providers
+export { default as AppProvider } from './providers/AppProvider.svelte';
+export { default as ViemProvider } from './providers/ViemProvider.svelte';
+export { default as FrameProvider } from './providers/FrameProvider.svelte';
+
+// Viem transport
+export { farcasterTransport } from './viem/transport.js';

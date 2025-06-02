@@ -4,15 +4,11 @@
 	import { error } from '@sveltejs/kit';
 	import { page } from '$app/state';
 	import { frameContext } from '$lib/stores';
-	import { getLogger } from '@logtape/logtape';
 
-	export const ssr = false;
-
-	const logger = getLogger(['frontend', 'frame']);
 	const { children } = $props();
 
 	onMount(async () => {
-		logger.info('FrameProvider mounted');
+		console.log('FrameProvider mounting');
 		await sdk.actions.ready();
 		const context = await sdk.context;
 		frameContext.set(context);
@@ -27,7 +23,7 @@
 				}
 			});
 			if (!csrf.ok) {
-				logger.error('Failed to get nonce', { status: csrf.status });
+				console.error('Failed to get nonce', { status: csrf.status, response: await csrf.json() });
 				error(csrf.status, 'Failed to get nonce');
 			}
 			const { nonce } = await csrf.json();
@@ -45,9 +41,8 @@
 				}
 			});
 			if (!login.ok) {
-				const { error } = await login.json();
-				logger.error('Failed to login', { status: login.status, error });
-				error(login.status, error);
+				console.error('Failed to login', { status: login.status, response: await login.json() });
+				error(login.status, 'Failed to login');
 			}
 		}
 
@@ -59,9 +54,10 @@
 					body: JSON.stringify({ token, url })
 				});
 				if (!res.ok) {
-					const { error } = await res.json();
-					logger.error('Failed to update user', { status: res.status, error });
-					error(res.status, error);
+					console.error('Failed to update user', {
+						status: res.status,
+						response: await res.json()
+					});
 				}
 			}
 		});
@@ -75,11 +71,13 @@
 				body: JSON.stringify({ token: null, url: null })
 			});
 			if (!res.ok) {
-				const { error } = await res.json();
-				logger.error('Failed to update user', { status: res.status, error });
-				error(res.status, error);
+				console.error('Failed to update user', {
+					status: res.status,
+					response: await res.json()
+				});
 			}
 		});
+		console.log('FrameProvider mounted');
 	});
 </script>
 

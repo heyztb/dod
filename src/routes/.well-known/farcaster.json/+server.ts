@@ -42,6 +42,8 @@ type MiniAppManifest = {
 		ogDescription?: string; // Open Graph description
 		ogImageUrl?: string; // Open Graph image URL
 		noindex?: boolean; // Whether to exclude from search results
+		requiredChains?: string[]; // Array of required chains
+		requriedCapabilities?: string[]; // Array of required capabilities
 	};
 };
 
@@ -70,7 +72,9 @@ const manifest: MiniAppManifest = {
 		ogDescription:
 			'A social dice game on Farcaster. Farkle is a game of strategy and chance. Realize your fate today.',
 		ogImageUrl: 'https://dod.ztb.dev/favicon.png',
-		noindex: false
+		noindex: false,
+		requiredChains: ['eip155:8453', 'eip155:84532'],
+		requriedCapabilities: ['wallet.getEthereumProvider']
 	}
 };
 

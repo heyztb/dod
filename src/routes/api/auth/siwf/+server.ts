@@ -3,6 +3,7 @@ import { createAppClient, viemConnector } from '@farcaster/auth-client';
 import { getUser, insertUserIfNotExists } from '$lib/server/db/index.js';
 import { createSession } from '$lib/server/auth/index.js';
 import { getDomainFromUrl } from '$lib';
+import { env } from '$env/dynamic/private';
 
 export async function POST({ request, cookies }) {
 	const { signature, message, nonce } = await request.json();
@@ -15,7 +16,9 @@ export async function POST({ request, cookies }) {
 	}
 
 	const appClient = createAppClient({
-		ethereum: viemConnector()
+		ethereum: viemConnector({
+			rpcUrl: `https://base-mainnet.g.alchemy.com/v2/${env.ALCHEMY_API_KEY}`
+		})
 	});
 	const verifyResponse = await appClient.verifySignInMessage({
 		message,

@@ -1,15 +1,15 @@
 <script lang="ts">
 	import Nav from '$lib/ui/Nav.svelte';
-	const FrameProvider = import('$lib/providers/FrameProvider.svelte');
+	const AppProvider = import('$lib/providers/AppProvider.svelte');
 	let { children } = $props();
 </script>
 
-{#if FrameProvider}
-	{#await FrameProvider then F}
-		{@const FrameProviderComponent = F.default}
-		<FrameProviderComponent>
+{#if AppProvider}
+	{#await AppProvider then P}
+		{@const Provider = P.default}
+		<Provider>
 			{@render children()}
 			<Nav />
-		</FrameProviderComponent>
+		</Provider>
 	{/await}
 {/if}
