@@ -15,14 +15,7 @@ const tunnel = spawn('cloudflared', [
 	process.env.CF_TUNNEL_KEY as string
 ]);
 
-tunnel.stdout.on('data', (data) => {
-	console.log(data.toString());
-});
-
-tunnel.stderr.on('data', (data) => {
-	console.error(data.toString());
-});
-
+console.log('cloudflared tunnel started');
 tunnel.on('close', (code) => {
-	console.log(`Cloudflared tunnel closed with code ${code}`);
+	console.log(`cloudflared tunnel closed with code ${code}`);
 });
