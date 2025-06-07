@@ -1,38 +1,14 @@
 <script lang="ts">
 	import { frameContext } from '$lib/stores';
-	import { Book, Network } from 'lucide-svelte';
+	import { Book } from 'lucide-svelte';
 	import Modal from '$lib/ui/Modal.svelte';
+	import ChainSwitchButton from '$lib/ui/ChainSwitchButton.svelte';
+	import ChainStatusBanner from '$lib/ui/ChainStatusBanner.svelte';
+	import PlayerStats from '$lib/ui/PlayerStats.svelte';
+	import GameTips from '$lib/ui/GameTips.svelte';
 	import { address, chainId, isConnected, viemStore } from '$lib/stores/viem';
-	import { useSwitchChain } from '$lib/hooks/useViem';
-	import { base, baseSepolia } from 'viem/chains';
 
 	let showRulesModal = $state(false);
-
-	const switchChain = useSwitchChain();
-
-	// Add chain switching function
-	async function handleSwitchChain() {
-		try {
-			// Switch to the other chain (if on mainnet, go to sepolia, and vice versa)
-			const targetChain = $chainId === base.id ? baseSepolia : base;
-			await switchChain(targetChain);
-			console.log(`Switched to ${targetChain.name}`);
-		} catch (error) {
-			console.error('Failed to switch chain:', error);
-		}
-	}
-
-	// Add function to get chain info
-	function getChainInfo(chainId: number | null) {
-		switch (chainId) {
-			case base.id:
-				return { color: 'bg-blue-500' };
-			case baseSepolia.id:
-				return { color: 'bg-purple-500' };
-			default:
-				return { color: 'bg-gray-500' };
-		}
-	}
 
 	// Console log wallet information when it changes
 	$effect(() => {
@@ -53,78 +29,110 @@
 	});
 </script>
 
-<div class="container mx-auto p-4 pb-20">
-	<div class="mb-6 flex items-center justify-between">
-		<h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">
-			Welcome {$frameContext?.user?.displayName || ''}
-		</h1>
+<div class="bg-surface-50-950 min-h-screen bg-gradient-to-br">
+	<div class="container mx-auto p-4 pb-20">
+		<div class="mb-8 flex items-center justify-between">
+			<h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">
+				Welcome {$frameContext?.user?.displayName || ''}
+			</h1>
 
-		<div class="flex gap-2">
-			<!-- Add chain switch button -->
-			{#if $isConnected}
+			<div class="flex gap-2">
+				<!-- Chain switch button -->
+				<ChainSwitchButton />
+
+				<!-- Rules button -->
 				<button
 					type="button"
-					onclick={handleSwitchChain}
-					class="btn preset-outlined-primary flex items-center gap-2 border border-blue-300 bg-white px-3 py-2 text-blue-700 hover:bg-blue-50 dark:border-blue-600 dark:bg-gray-800 dark:text-blue-200 dark:hover:bg-gray-700"
-					aria-label="Switch blockchain network"
+					class="btn preset-outlined-neutral-200-800 flex items-center gap-2 border border-gray-300/50 bg-white/80 p-3 text-gray-700 backdrop-blur-sm transition-all duration-200 hover:bg-white hover:shadow-md dark:border-gray-600/50 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-800"
+					onclick={() => (showRulesModal = true)}
+					aria-label="View game rules"
 				>
-					<Network size={18} />
-					<span class="hidden sm:inline">Switch Chain</span>
+					<Book size={20} />
+					<span class="hidden sm:inline">Rules</span>
 				</button>
-			{/if}
-
-			<!-- Rules button -->
-			<button
-				type="button"
-				class="btn preset-outlined-neutral-200-800 flex items-center gap-2 border border-gray-300 bg-white p-3 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-				onclick={() => (showRulesModal = true)}
-				aria-label="View game rules"
-			>
-				<Book size={20} />
-				<span class="hidden sm:inline">Rules</span>
-			</button>
+			</div>
 		</div>
-	</div>
 
-	<!-- Main content area -->
-	<div class="rounded-lg bg-gray-100 p-6 dark:bg-gray-800">
-		<h2 class="mb-4 text-2xl font-semibold text-gray-900 dark:text-gray-100">Ready to Play?</h2>
-		<p class="mb-6 text-lg text-gray-700 dark:text-gray-300">
-			Roll six dice to score points. First to 10,000, or highest score wins!
-		</p>
+		<!-- Main unified content pane -->
+		<div
+			class="bg-surface-100-900/25 relative overflow-hidden rounded-2xl p-8 shadow-xl backdrop-blur-sm dark:shadow-2xl"
+		>
+			<!-- Subtle background pattern -->
+			<div
+				class="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
+				style="background-image: radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0); background-size: 20px 20px;"
+			></div>
 
-		<!-- Game Action Buttons -->
-		<div class="mx-auto flex max-w-md flex-col gap-4 space-y-2 sm:flex-row sm:gap-6">
-			<button
-				type="button"
-				class="btn preset-filled flex-1 px-6 py-4 text-lg font-semibold transition-all duration-200 ease-in-out hover:scale-105"
-				onclick={() => console.log('Host Game clicked')}
-			>
-				🎲 Host Game
-			</button>
+			<!-- Hero section -->
+			<div class="relative mb-8 text-center">
+				<h2 class="mb-3 text-3xl font-bold text-gray-900 dark:text-gray-100">Ready to Roll?</h2>
+				<p class="mx-auto max-w-2xl text-lg text-gray-700 dark:text-gray-400">
+					Roll six dice to score points. First to 10,000, or highest score wins!
+				</p>
+			</div>
 
-			<button
-				type="button"
-				class="btn preset-outlined-surface-950-50 flex-1 px-6 py-4 text-lg font-semibold transition-all duration-200 ease-in-out hover:scale-105"
-				onclick={() => console.log('Join Game clicked')}
-			>
-				👥 Join Game
-			</button>
+			<!-- Game Action Buttons -->
+			<div class="mb-10 flex flex-col gap-4 sm:flex-row sm:gap-6">
+				<button
+					type="button"
+					class="group relative flex-1 overflow-hidden rounded-xl bg-gradient-to-r from-orange-400 to-red-500 px-8 py-6 text-lg font-semibold text-white shadow-lg transition-all duration-300 ease-out hover:scale-[1.02] hover:from-orange-500 hover:to-red-600 hover:shadow-xl"
+					onclick={() => console.log('Host Game clicked')}
+				>
+					<div
+						class="absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+					></div>
+					<span class="relative flex items-center justify-center gap-3">
+						<span class="text-2xl">🎲</span>
+						Host Game
+					</span>
+				</button>
+
+				<button
+					type="button"
+					class="group relative flex-1 overflow-hidden rounded-xl border-2 border-teal-300/50 bg-teal-50/50 px-8 py-6 text-lg font-semibold text-teal-700 backdrop-blur-sm transition-all duration-300 ease-out hover:scale-[1.02] hover:border-teal-400/50 hover:bg-teal-100/80 hover:shadow-lg dark:border-teal-600/50 dark:bg-teal-900/30 dark:text-teal-200 dark:hover:border-teal-500/50 dark:hover:bg-teal-800/50"
+					onclick={() => console.log('Join Game clicked')}
+				>
+					<span class="relative flex items-center justify-center gap-3">
+						<span class="text-2xl">👥</span>
+						Join Game
+					</span>
+				</button>
+			</div>
+
+			<!-- Stats and Tips in flowing layout -->
+			<div class="grid gap-8 lg:grid-cols-2">
+				<!-- Player Stats Section -->
+				<div class="space-y-4">
+					<h3
+						class="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100"
+					>
+						<div class="h-1 w-8 rounded-full bg-gradient-to-r from-orange-400 to-red-500"></div>
+						Your Stats
+					</h3>
+					<div class="space-y-3">
+						<PlayerStats />
+					</div>
+				</div>
+
+				<!-- Game Tips Section -->
+				<div class="space-y-4">
+					<h3
+						class="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-gray-100"
+					>
+						<div class="h-1 w-8 rounded-full bg-gradient-to-r from-teal-400 to-cyan-500"></div>
+						Quick Tips
+					</h3>
+					<div class="space-y-3">
+						<GameTips />
+					</div>
+				</div>
+			</div>
 		</div>
 	</div>
 </div>
 
-<!-- Chain Status Banner - Fixed at bottom -->
-{#if $isConnected}
-	{@const chainInfo = getChainInfo($chainId)}
-	<div class="fixed right-0 bottom-0 left-0 {chainInfo.color} px-4 py-3 shadow-lg">
-		<div class="container mx-auto flex items-center justify-between"></div>
-	</div>
-{:else}
-	<div class="fixed right-0 bottom-0 left-0 bg-gray-500 px-4 py-3 shadow-lg">
-		<div class="container mx-auto flex items-center justify-center"></div>
-	</div>
-{/if}
+<!-- Chain Status Banner -->
+<ChainStatusBanner />
 
 <!-- Rules Modal -->
 <Modal bind:open={showRulesModal} title="Farkle Rules">
