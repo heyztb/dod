@@ -13,9 +13,37 @@
 		const context = await sdk.context;
 		frameContext.set(context);
 		if (!context.client.added) {
-			await sdk.actions.addFrame();
+			await sdk.actions.addMiniApp(); // Updated method name
 		}
+
 		if (!page.data.session) {
+			try {
+				// Try Quick Auth first (better UX, no manual verification needed)
+				console.log('Attempting Quick Auth...');
+				const { token } = await sdk.actions.quickAuth();
+
+				const quickAuthLogin = await fetch('/api/auth/quick-auth', {
+					method: 'POST',
+					body: JSON.stringify({ token }),
+					headers: {
+						'Content-Type': 'application/json'
+					}
+				});
+
+				if (quickAuthLogin.ok) {
+					console.log('Quick Auth successful');
+					// Reload to get updated session data
+					window.location.reload();
+					return;
+				} else {
+					console.warn('Quick Auth failed, falling back to legacy auth');
+				}
+			} catch (quickAuthError) {
+				console.warn('Quick Auth not available, using legacy auth:', quickAuthError);
+			}
+
+			// Fallback to legacy SIWF flow
+			console.log('Using legacy SIWF authentication...');
 			const csrf = await fetch('/api/auth/csrf', {
 				method: 'GET',
 				headers: {
