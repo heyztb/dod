@@ -148,7 +148,7 @@ Blockchain confirms in background
 
 ### **Phase 1: Smart Contract Foundation (Weeks 1-2)**
 
-```typescript
+```text
 // Development priorities:
 1. Deploy basic FarkleGame contract
 2. Implement dice rolling with mock randomness
