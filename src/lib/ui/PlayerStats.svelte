@@ -77,7 +77,7 @@
 		</div>
 		<div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
 			<div
-				class="h-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-300"
+				class="h-2 rounded-full bg-gradient-to-r from-orange-500 to-red-600 transition-all duration-300"
 				style="width: {(playerStats.gamesPlayed / 50) * 100}%"
 			></div>
 		</div>
