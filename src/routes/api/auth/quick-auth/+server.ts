@@ -3,6 +3,9 @@ import { createClient } from '@farcaster/quick-auth';
 import { getUser, insertUserIfNotExists } from '$lib/server/db/index.js';
 import { createSession } from '$lib/server/auth/index.js';
 import { getDomainFromUrl } from '$lib';
+import { getLogger } from '@logtape/logtape';
+
+const logger = getLogger(['backend', 'auth', 'quick-auth']);
 
 export async function POST({ request, cookies }) {
   try {
@@ -16,19 +19,19 @@ export async function POST({ request, cookies }) {
     const client = createClient();
     const domain = getDomainFromUrl(request.url);
 
-    console.log('Verifying Quick Auth token for domain:', domain);
+    logger.debug('Verifying Quick Auth token', { domain });
 
     const payload = await client.verifyJwt({
       token,
       domain
     });
 
-    console.log('Quick auth verification successful:', {
+    logger.debug('Quick auth verification successful', {
       fid: payload.sub,
       address: payload.address
     });
 
-    const fid = payload.sub as number;
+    const fid = payload.sub as unknown as number;
 
     // Use existing user management system
     let user = await getUser(fid);
@@ -49,14 +52,17 @@ export async function POST({ request, cookies }) {
       expires: session.expiresAt
     });
 
-    console.log('Quick auth login successful for FID:', fid);
+    logger.info('Quick auth login successful', { fid, userId: user.id });
     return json({
       success: true,
       user: { fid, id: user.id }
     });
 
   } catch (error) {
-    console.error('Quick auth verification failed:', error);
+    logger.error('Quick auth verification failed', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
     return json({
       error: error instanceof Error ? error.message : 'Authentication failed'
     }, { status: 401 });

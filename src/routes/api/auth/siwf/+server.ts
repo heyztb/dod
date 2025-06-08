@@ -4,10 +4,16 @@ import { getUser, insertUserIfNotExists } from '$lib/server/db/index.js';
 import { createSession } from '$lib/server/auth/index.js';
 import { getDomainFromUrl } from '$lib';
 import { env } from '$env/dynamic/private';
+import { getLogger } from '@logtape/logtape';
+
+const logger = getLogger(['backend', 'auth', 'siwf']);
 
 export async function POST({ request, cookies }) {
 	const { signature, message, nonce } = await request.json();
-	console.log('cookies', cookies.getAll());
+	logger.debug('SIWF authentication attempt', {
+		hasNonce: !!nonce,
+		cookieCount: cookies.getAll().length
+	});
 	if (!nonce) {
 		return json({ error: 'Missing nonce' }, { status: 401 });
 	}
@@ -28,8 +34,12 @@ export async function POST({ request, cookies }) {
 		acceptAuthAddress: true
 	});
 	const { success, fid, error } = verifyResponse;
-	console.log('verifySignInMessage', { success, fid, error });
+	logger.debug('SIWF message verification result', { success, fid, hasError: !!error });
 	if (error) {
+		logger.warn('SIWF verification failed', {
+			error: error.message,
+			fid
+		});
 		return json({ error: error.message }, { status: 401 });
 	}
 
@@ -49,6 +59,6 @@ export async function POST({ request, cookies }) {
 		expires: session.expiresAt
 	});
 
-	console.log('login', 'done');
+	logger.info('SIWF login successful', { fid, userId: user.id });
 	return json({ success: true });
 }
