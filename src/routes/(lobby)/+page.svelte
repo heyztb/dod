@@ -6,6 +6,7 @@
 	import ChainStatusBanner from '$lib/ui/ChainStatusBanner.svelte';
 	import PlayerStats from '$lib/ui/PlayerStats.svelte';
 	import GameTips from '$lib/ui/GameTips.svelte';
+	import EnvironmentBanner from '$lib/ui/EnvironmentBanner.svelte';
 	import { address, chainId, isConnected, viemStore } from '$lib/stores/viem';
 
 	let showRulesModal = $state(false);
@@ -52,6 +53,9 @@
 				</button>
 			</div>
 		</div>
+
+		<!-- Environment Detection Banner -->
+		<EnvironmentBanner />
 
 		<!-- Main unified content pane -->
 		<div
