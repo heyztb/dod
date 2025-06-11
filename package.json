@@ -48,7 +48,7 @@
 	},
 	"dependencies": {
 		"@farcaster/auth-client": "^0.7.0",
-		"@farcaster/frame-sdk": "^0.0.60",
+		"@farcaster/frame-sdk": "^0.0.61",
 		"@farcaster/frame-wagmi-connector": "^0.0.26",
 		"@farcaster/quick-auth": "^0.0.6",
 		"@logtape/file": "^0.10.0",
