@@ -28,6 +28,10 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 	error MustRollFirst();
 	error DiceAlreadySelected();
 	error NoScoringDice();
+	error NoDiceAvailable();
+	error MustSelectAtLeastOneDie();
+	error SelectionMustScorePoints();
+	error MustRollAtLeastOnce();
 
 	modifier onlyCurrentPlayer() {
 		if (msg.sender != players[currentPlayer]) revert NotCurrentPlayer();
@@ -55,7 +59,7 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 	}
 
 	function roll() external override onlyCurrentPlayer {
-		require(dice.availableCount > 0, 'No dice available to roll');
+		if (dice.availableCount == 0) revert NoDiceAvailable();
 
 		// Generate new dice values, preserving selected dice
 		uint8[6] memory newValues = _rollAvailableDice();
@@ -69,21 +73,23 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 		}
 	}
 
-	function bank(uint8[] calldata selectedIndices) external onlyCurrentPlayer returns (uint256) {
-		require(dice.hasRolled, 'Must roll first');
-		require(selectedIndices.length > 0, 'Must select at least one die');
+	function selectDice(
+		uint8[] calldata selectedIndices
+	) external onlyCurrentPlayer returns (uint256) {
+		if (!dice.hasRolled) revert MustRollFirst();
+		if (selectedIndices.length == 0) revert MustSelectAtLeastOneDie();
 
 		// Validate selections
 		uint8[6] memory currentValues = _unpackDiceValues(dice.values);
 		for (uint256 i = 0; i < selectedIndices.length; i++) {
 			uint8 index = selectedIndices[i];
-			require(index < 6, 'Invalid die index');
-			require((dice.selectedMask & (1 << index)) == 0, 'Die already selected');
+			if (index >= 6) revert InvalidSelection();
+			if ((dice.selectedMask & (1 << index)) != 0) revert DiceAlreadySelected();
 		}
 
 		// Calculate score for this selection
 		uint256 score = _calculateSelectionScore(selectedIndices, currentValues);
-		require(score > 0, 'Selection must score points');
+		if (score == 0) revert SelectionMustScorePoints();
 
 		// Update state
 		dice.turnScore += uint32(score);
@@ -104,15 +110,18 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 			dice.hasRolled = false; // Player must roll again
 		}
 
-		emit Banked(msg.sender, score);
+		emit DiceSelected(msg.sender, score);
 		return score;
 	}
 
-	function endTurn() external onlyCurrentPlayer {
-		require(dice.hasRolled, 'Must roll at least once');
+	function bank() external onlyCurrentPlayer {
+		if (!dice.hasRolled) revert MustRollAtLeastOnce();
 
 		// Bank the turn score
-		playerScores[players[currentPlayer]] += dice.turnScore;
+		uint256 totalScore = dice.turnScore;
+		playerScores[players[currentPlayer]] += totalScore;
+
+		emit Banked(msg.sender, totalScore);
 
 		// Reset for next player
 		_nextTurn();

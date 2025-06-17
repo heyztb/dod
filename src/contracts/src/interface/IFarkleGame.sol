@@ -5,12 +5,13 @@ interface IFarkleGame {
 	// Core game functions
 	function roll() external;
 
-	function bank(uint8[] calldata selectedIndices) external returns (uint256);
+	function selectDice(uint8[] calldata selectedIndices) external returns (uint256);
 
-	function endTurn() external;
+	function bank() external;
 
 	// Events
 	event DiceThrown(address indexed player, uint48 values);
-	event Banked(address indexed player, uint256 score);
+	event DiceSelected(address indexed player, uint256 score);
+	event Banked(address indexed player, uint256 totalScore);
 	event Farkled(address indexed player);
 }

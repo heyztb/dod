@@ -73,7 +73,8 @@ contract FarkleGameImplTest is Test {
 
 	// Events for testing
 	event DiceThrown(address indexed player, uint48 values);
-	event Banked(address indexed player, uint256 score);
+	event DiceSelected(address indexed player, uint256 score);
+	event Banked(address indexed player, uint256 totalScore);
 	event Farkled(address indexed player);
 
 	function setUp() public {
@@ -529,14 +530,14 @@ contract FarkleGameImplTest is Test {
 		uint48 packed = testHarness.exposed_packDiceValues(scoringDice);
 		testHarness.setDiceState(packed, 0, 6, 0, true);
 
-		// Bank all dice
+		// Select all dice
 		uint8[] memory allIndices = new uint8[](6);
 		for (uint i = 0; i < 6; i++) {
 			allIndices[i] = uint8(i);
 		}
 
-		uint256 score = testHarness.bank(allIndices);
-		console.log('Banking all 6 dice...');
+		uint256 score = testHarness.selectDice(allIndices);
+		console.log('Selecting all 6 dice...');
 		console.log('  Expected Score: 1500 (Four of a Kind + Pair rule)');
 		console.log('  Actual Score:  ', score);
 
@@ -580,14 +581,14 @@ contract FarkleGameImplTest is Test {
 		uint48 packed = testHarness.exposed_packDiceValues(initialRoll);
 		testHarness.setDiceState(packed, 0, 6, 0, true);
 
-		// Bank the 1 and 5
+		// Select the 1 and 5
 		uint8[] memory selection1 = new uint8[](2);
 		selection1[0] = 0; // Die showing 1
 		selection1[1] = 3; // Die showing 5
 		console.log('Selecting dice at positions 0 and 3 (values 1 and 5)');
 
-		uint256 score1 = testHarness.bank(selection1);
-		console.log('First banking result:');
+		uint256 score1 = testHarness.selectDice(selection1);
+		console.log('First selection result:');
 		console.log('  Score earned: ', score1, '(expected 150)');
 		console.log('  Turn score:   ', testHarness.getTurnScore());
 		console.log('  Available:    ', testHarness.getAvailableCount(), '(should be 4)');
@@ -603,10 +604,10 @@ contract FarkleGameImplTest is Test {
 		console.log('Selected mask expected:', expectedMask);
 		assertEq(actualMask, expectedMask, 'Selected mask should mark dice 0 and 3');
 
-		// Player could roll again with remaining 4 dice or end turn
-		// Let's test ending turn
-		console.log('Player chooses to end turn...');
-		testHarness.endTurn();
+		// Player could roll again with remaining 4 dice or bank their points
+		// Let's test banking the points
+		console.log('Player chooses to bank their points...');
+		testHarness.bank();
 
 		// Check that player's score was updated
 		uint256 playerScore = testHarness.playerScores(address(this));
@@ -645,28 +646,27 @@ contract FarkleGameImplTest is Test {
 		console.log('PASS: NotCurrentPlayer error thrown correctly');
 	}
 
-	function test_bank_mustRollFirst() public {
-		console.log('=== BANK MUST ROLL FIRST TEST ===');
+	function test_selectDice_mustRollFirst() public {
+		console.log('=== SELECT DICE MUST ROLL FIRST TEST ===');
 
 		address[] memory players = new address[](2);
 		players[0] = address(this);
 		players[1] = address(0x2);
 
 		testHarness.initialize(address(this), players);
-		console.log('Game initialized, attempting to bank without rolling...');
 
-		// Try to bank without rolling first
+		// Try to select dice without rolling first
 		uint8[] memory selection = new uint8[](1);
 		selection[0] = 0;
 
-		vm.expectRevert('Must roll first');
-		testHarness.bank(selection);
+		vm.expectRevert(abi.encodeWithSignature('MustRollFirst()'));
+		testHarness.selectDice(selection);
 
 		console.log('PASS: Must roll first error thrown correctly');
 	}
 
-	function test_bank_invalidIndices() public {
-		console.log('=== BANK INVALID INDICES TEST ===');
+	function test_selectDice_invalidIndices() public {
+		console.log('=== SELECT DICE INVALID INDICES TEST ===');
 
 		address[] memory players = new address[](2);
 		players[0] = address(this);
@@ -679,18 +679,18 @@ contract FarkleGameImplTest is Test {
 		uint48 packed = testHarness.exposed_packDiceValues(dice);
 		testHarness.setDiceState(packed, 0, 6, 0, true);
 
-		// Try to bank with invalid die index (>= 6)
+		// Try to select dice with invalid die index (>= 6)
 		uint8[] memory invalidSelection = new uint8[](1);
 		invalidSelection[0] = 6; // Invalid index
 
-		vm.expectRevert('Invalid die index');
-		testHarness.bank(invalidSelection);
+		vm.expectRevert(abi.encodeWithSignature('InvalidSelection()'));
+		testHarness.selectDice(invalidSelection);
 
 		console.log('PASS: Invalid die index error thrown correctly');
 	}
 
-	function test_bank_emptySelection() public {
-		console.log('=== BANK EMPTY SELECTION TEST ===');
+	function test_selectDice_emptySelection() public {
+		console.log('=== SELECT DICE EMPTY SELECTION TEST ===');
 
 		address[] memory players = new address[](2);
 		players[0] = address(this);
@@ -703,17 +703,17 @@ contract FarkleGameImplTest is Test {
 		uint48 packed = testHarness.exposed_packDiceValues(dice);
 		testHarness.setDiceState(packed, 0, 6, 0, true);
 
-		// Try to bank with empty selection
+		// Try to select dice with empty selection
 		uint8[] memory emptySelection = new uint8[](0);
 
-		vm.expectRevert('Must select at least one die');
-		testHarness.bank(emptySelection);
+		vm.expectRevert(abi.encodeWithSignature('MustSelectAtLeastOneDie()'));
+		testHarness.selectDice(emptySelection);
 
 		console.log('PASS: Empty selection error thrown correctly');
 	}
 
-	function test_bank_alreadySelectedDice() public {
-		console.log('=== BANK ALREADY SELECTED DICE TEST ===');
+	function test_selectDice_alreadySelectedDice() public {
+		console.log('=== SELECT DICE ALREADY SELECTED DICE TEST ===');
 
 		address[] memory players = new address[](2);
 		players[0] = address(this);
@@ -731,14 +731,14 @@ contract FarkleGameImplTest is Test {
 		uint8[] memory invalidSelection = new uint8[](1);
 		invalidSelection[0] = 0; // Already selected
 
-		vm.expectRevert('Die already selected');
-		testHarness.bank(invalidSelection);
+		vm.expectRevert(abi.encodeWithSignature('DiceAlreadySelected()'));
+		testHarness.selectDice(invalidSelection);
 
 		console.log('PASS: Die already selected error thrown correctly');
 	}
 
-	function test_bank_nonScoringDice() public {
-		console.log('=== BANK NON-SCORING DICE TEST ===');
+	function test_selectDice_nonScoringDice() public {
+		console.log('=== SELECT DICE NON-SCORING DICE TEST ===');
 
 		address[] memory players = new address[](2);
 		players[0] = address(this);
@@ -751,18 +751,18 @@ contract FarkleGameImplTest is Test {
 		uint48 packed = testHarness.exposed_packDiceValues(dice);
 		testHarness.setDiceState(packed, 0, 6, 0, true);
 
-		// Try to bank a single 2 (doesn't score)
+		// Try to select a single 2 (doesn't score)
 		uint8[] memory nonScoringSelection = new uint8[](1);
 		nonScoringSelection[0] = 0; // Single 2 doesn't score
 
-		vm.expectRevert('Selection must score points');
-		testHarness.bank(nonScoringSelection);
+		vm.expectRevert(abi.encodeWithSignature('SelectionMustScorePoints()'));
+		testHarness.selectDice(nonScoringSelection);
 
 		console.log('PASS: Non-scoring selection error thrown correctly');
 	}
 
-	function test_endTurn_notCurrentPlayer() public {
-		console.log('=== END TURN NOT CURRENT PLAYER TEST ===');
+	function test_bank_notCurrentPlayer() public {
+		console.log('=== BANK NOT CURRENT PLAYER TEST ===');
 
 		address[] memory players = new address[](2);
 		players[0] = address(0x1);
@@ -770,16 +770,16 @@ contract FarkleGameImplTest is Test {
 
 		testHarness.initialize(address(this), players);
 
-		// Try to call endTurn() as wrong player
+		// Try to call bank() as wrong player
 		vm.prank(address(0x2));
 		vm.expectRevert(abi.encodeWithSignature('NotCurrentPlayer()'));
-		testHarness.endTurn();
+		testHarness.bank();
 
-		console.log('PASS: EndTurn NotCurrentPlayer error thrown correctly');
+		console.log('PASS: Bank NotCurrentPlayer error thrown correctly');
 	}
 
-	function test_endTurn_mustRollFirst() public {
-		console.log('=== END TURN MUST ROLL FIRST TEST ===');
+	function test_bank_mustRollFirst() public {
+		console.log('=== BANK MUST ROLL FIRST TEST ===');
 
 		address[] memory players = new address[](2);
 		players[0] = address(this);
@@ -787,11 +787,11 @@ contract FarkleGameImplTest is Test {
 
 		testHarness.initialize(address(this), players);
 
-		// Try to end turn without rolling
-		vm.expectRevert('Must roll at least once');
-		testHarness.endTurn();
+		// Try to bank without rolling
+		vm.expectRevert(abi.encodeWithSignature('MustRollAtLeastOnce()'));
+		testHarness.bank();
 
-		console.log('PASS: EndTurn must roll first error thrown correctly');
+		console.log('PASS: Bank must roll first error thrown correctly');
 	}
 
 	// FARKLE SCENARIO TESTS
@@ -868,8 +868,8 @@ contract FarkleGameImplTest is Test {
 		console.log('PASS: DiceThrown event emitted correctly');
 	}
 
-	function test_events_banked() public {
-		console.log('=== BANKED EVENT TEST ===');
+	function test_events_diceSelected() public {
+		console.log('=== DICE SELECTED EVENT TEST ===');
 
 		address[] memory players = new address[](2);
 		players[0] = address(this);
@@ -882,19 +882,19 @@ contract FarkleGameImplTest is Test {
 		uint48 packed = testHarness.exposed_packDiceValues(dice);
 		testHarness.setDiceState(packed, 0, 6, 0, true);
 
-		// Bank the 1 and 5
+		// Select the 1 and 5
 		uint8[] memory selection = new uint8[](2);
 		selection[0] = 0; // 1
 		selection[1] = 1; // 5
 
-		// Expect Banked event with correct score (150)
+		// Expect DiceSelected event with correct score (150)
 		vm.expectEmit(true, false, false, true);
-		emit Banked(address(this), 150);
+		emit DiceSelected(address(this), 150);
 
-		uint256 score = testHarness.bank(selection);
+		uint256 score = testHarness.selectDice(selection);
 		assertEq(score, 150, 'Score should be 150');
 
-		console.log('PASS: Banked event emitted correctly');
+		console.log('PASS: DiceSelected event emitted correctly');
 	}
 
 	// MULTI-TURN GAME FLOW TESTS
@@ -914,17 +914,17 @@ contract FarkleGameImplTest is Test {
 		uint48 packed1 = testHarness.exposed_packDiceValues(dice1);
 		testHarness.setDiceState(packed1, 0, 6, 0, true);
 
-		// Bank two 1s and one 5 (250 points)
+		// Select two 1s and one 5 (250 points)
 		uint8[] memory selection1 = new uint8[](3);
 		selection1[0] = 0; // 1
 		selection1[1] = 1; // 1
 		selection1[2] = 5; // 5
 
-		uint256 score1 = testHarness.bank(selection1);
+		uint256 score1 = testHarness.selectDice(selection1);
 		assertEq(score1, 250, 'First selection should score 250');
 
-		// End turn
-		testHarness.endTurn();
+		// Bank the points
+		testHarness.bank();
 
 		// Check player 0 score and turn advancement
 		uint256 player0Score = testHarness.playerScores(address(this));
@@ -940,16 +940,16 @@ contract FarkleGameImplTest is Test {
 		uint48 packed2 = testHarness.exposed_packDiceValues(dice2);
 		testHarness.setDiceState(packed2, 0, 6, 0, true);
 
-		// Bank three 5s (should be counted as three of a kind = 500 points)
+		// Select three 5s (should be counted as three of a kind = 500 points)
 		uint8[] memory selection2 = new uint8[](3);
 		selection2[0] = 0; // 5
 		selection2[1] = 1; // 5
 		selection2[2] = 2; // 5
 
-		uint256 score2 = testHarness.bank(selection2);
+		uint256 score2 = testHarness.selectDice(selection2);
 		assertEq(score2, 500, 'Three 5s should score 500 (3 of a kind)');
 
-		testHarness.endTurn();
+		testHarness.bank();
 		vm.stopPrank();
 
 		// Check final state
@@ -983,7 +983,7 @@ contract FarkleGameImplTest is Test {
 		uint48 packed = testHarness.exposed_packDiceValues(dice);
 		testHarness.setDiceState(packed, 0x3F, 0, 0, false); // All dice selected, 0 available
 
-		vm.expectRevert('No dice available to roll');
+		vm.expectRevert(abi.encodeWithSignature('NoDiceAvailable()'));
 		testHarness.roll();
 
 		console.log('PASS: No dice available error thrown correctly');
