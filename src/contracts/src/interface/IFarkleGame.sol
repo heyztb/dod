@@ -2,6 +2,8 @@
 pragma solidity ^0.8.30;
 
 interface IFarkleGame {
+	function initialize(address _room, address[] calldata _players) external;
+
 	// Core game functions
 	function roll() external;
 
