@@ -42,6 +42,7 @@ contract FarkleRoomImpl is IFarkleRoom, Ownable, Initializable {
 				players[i] = players[players.length - 1];
 				players.pop();
 				emit PlayerLeft(msg.sender);
+				return;
 			}
 		}
 		revert AlreadyLeft();
