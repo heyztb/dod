@@ -34,7 +34,7 @@ The Cairo application (`cairoroller/src/lib.cairo`) provides:
 **Key Features**:
 - Deterministic but unpredictable dice generation
 - Cryptographically sound using Pedersen hashing
-- Supports unlimited dice rolls per seed (with checkpoint upgrades planned)
+- Supports unlimited dice rolls per seed
 - Built-in commitment scheme for transparency
 
 ## Integration Architecture
