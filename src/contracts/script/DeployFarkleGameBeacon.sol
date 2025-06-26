@@ -72,26 +72,7 @@ contract DeployFarkleGameBeacon is Script {
 	}
 
 	function salt() internal view returns (bytes32) {
-		// Generate a deterministic salt based on the current block and deployer
+		// Generate a deterministic salt based on the current chain and deployer
 		return keccak256(abi.encodePacked(block.chainid, msg.sender, 'FarkleBeacon'));
-	}
-
-	// Helper function to deploy with custom parameters
-	function deployBeaconWithParams(
-		address initialOwner,
-		address initialImplementation,
-		bytes32 _salt
-	) external returns (address) {
-		bytes memory bytecode = getBeaconBytecode();
-		bytes memory constructorArgs = abi.encode(initialOwner, initialImplementation);
-		bytes memory deploymentBytecode = abi.encodePacked(bytecode, constructorArgs);
-
-		address beacon;
-		assembly {
-			beacon := create2(0, add(deploymentBytecode, 0x20), mload(deploymentBytecode), _salt)
-		}
-
-		require(beacon != address(0), 'Beacon deployment failed');
-		return beacon;
 	}
 }
