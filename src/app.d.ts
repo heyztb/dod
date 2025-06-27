@@ -3,17 +3,16 @@
 import type { User } from '$lib/server/db/schema';
 
 declare global {
-	namespace App {
-		// interface Error {}
-		interface Locals {
-			user: User | null;
-			session: Session | null;
-			requestId: string;
-		}
-		// interface PageData {}
-		// interface PageState {}
-		// interface Platform {}
-	}
+    namespace App {
+        // interface Error {}
+        interface Locals {
+            user: User | null;
+            requestId: string;
+        }
+        // interface PageData {}
+        // interface PageState {}
+        // interface Platform {}
+    }
 }
 
 export {};
