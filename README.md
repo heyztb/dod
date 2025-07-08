@@ -46,10 +46,12 @@ This project is licensed under the GNU Affero General Public License v3.0 (AGPL-
 **Commercial licenses are available for organizations that wish to use this software in proprietary applications without the AGPL-3.0 copyleft requirements.**
 
 For commercial licensing inquiries, please contact:
+
 - Email: [hi (at) ztb dot dev]
 - Website: [https://ztb.dev]
 
 Commercial licenses include:
+
 - Freedom to use in proprietary software
 - No requirement to open source your application
 - Priority support and maintenance
