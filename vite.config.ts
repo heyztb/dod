@@ -3,9 +3,9 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-	plugins: [tailwindcss(), sveltekit()],
-	server: {
-		allowedHosts: ['localhost', 'dod.ztb.dev'],
-		origin: 'https://dod.ztb.dev'
-	}
+    plugins: [tailwindcss(), sveltekit()],
+    server: {
+        allowedHosts: ['localhost', 'dod.ztb.dev'],
+        origin: 'https://dod.ztb.dev'
+    }
 });
