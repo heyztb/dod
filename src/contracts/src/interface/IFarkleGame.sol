@@ -16,4 +16,5 @@ interface IFarkleGame {
 	event DiceSelected(address indexed player, uint256 score);
 	event Banked(address indexed player, uint256 totalScore);
 	event Farkled(address indexed player);
+	event GameOver(address indexed winner);
 }

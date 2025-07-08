@@ -9,6 +9,7 @@ contract FarkleRoomImpl is IFarkleRoom, Ownable, Initializable {
 	string public constant VERSION = 'v1';
 	uint256 public maxPlayers;
 	address[] public players;
+	uint256 public entryFee;
 
 	error AlreadyJoined();
 	error AlreadyLeft();

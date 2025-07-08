@@ -10,6 +10,7 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 	address public room;
 	address[] public players;
 	uint256 public currentPlayer;
+	uint256 public entryFee;
 	mapping(address => uint256) public playerScores;
 
 	struct DiceState {
@@ -42,13 +43,18 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 		_disableInitializers();
 	}
 
-	function initialize(address _room, address[] calldata _players) external virtual initializer {
+	function initialize(
+		address _room,
+		address[] calldata _players,
+		uint256 _entryFee
+	) external virtual initializer {
 		_initializeOwner(msg.sender);
 		room = _room;
 		players = _players;
 		for (uint256 i = 0; i < _players.length; i++) {
 			playerScores[_players[i]] = 0;
 		}
+		entryFee = _entryFee;
 		dice = DiceState({
 			values: 0,
 			selectedMask: 0,
