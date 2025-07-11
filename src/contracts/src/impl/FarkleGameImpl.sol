@@ -4,14 +4,24 @@ pragma solidity ^0.8.30;
 import {Ownable} from '@solady/auth/Ownable.sol';
 import {Initializable} from '@solady/utils/Initializable.sol';
 import {IFarkleGame} from '@interface/IFarkleGame.sol';
+import {IFarkleLeaderboard, PlayerResult} from '@interface/IFarkleLeaderboard.sol';
+import {IFarkleRoom} from '@interface/IFarkleRoom.sol';
 
 contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 	string public constant VERSION = 'v1';
-	address public room;
+	IFarkleRoom public room;
+	IFarkleLeaderboard public leaderboard;
 	address[] public players;
 	uint256 public currentPlayer;
 	uint256 public entryFee;
 	mapping(address => uint256) public playerScores;
+	uint256 public constant MAX_SCORE = 10_000;
+	address public finalTurnPlayer;
+	address public winner;
+	bool public finalTurn = false;
+	bool public gameEnded = false;
+	mapping(address => uint256) public farkleCounts;
+	mapping(address => uint256) public hotDiceCounts;
 
 	struct DiceState {
 		uint48 values; // Current dice values (1-6 each)
@@ -23,8 +33,17 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 
 	DiceState public dice;
 
+	// Events
+	event DiceThrown(address indexed player, uint48 values);
+	event DiceSelected(address indexed player, uint256 score);
+	event Banked(address indexed player, uint256 turnScore, uint256 totalScore);
+	event Farkled(address indexed player);
+	event FinalTurn();
+	event GameOver(address indexed winner, uint256 score);
+
+	// Errors
 	error NotCurrentPlayer();
-	error GameOver();
+	error GameAlreadyOver();
 	error InvalidSelection();
 	error MustRollFirst();
 	error DiceAlreadySelected();
@@ -39,17 +58,24 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 		_;
 	}
 
+	modifier notAfterGameOver() {
+		if (gameEnded) revert GameAlreadyOver();
+		_;
+	}
+
 	constructor() {
 		_disableInitializers();
 	}
 
 	function initialize(
 		address _room,
+		address _leaderboard,
 		address[] calldata _players,
 		uint256 _entryFee
 	) external virtual initializer {
 		_initializeOwner(msg.sender);
-		room = _room;
+		room = IFarkleRoom(_room);
+		leaderboard = IFarkleLeaderboard(_leaderboard);
 		players = _players;
 		for (uint256 i = 0; i < _players.length; i++) {
 			playerScores[_players[i]] = 0;
@@ -64,7 +90,7 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 		});
 	}
 
-	function roll() external override onlyCurrentPlayer {
+	function roll() external override onlyCurrentPlayer notAfterGameOver {
 		if (dice.availableCount == 0) revert NoDiceAvailable();
 
 		// Generate new dice values, preserving selected dice
@@ -81,7 +107,7 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 
 	function selectDice(
 		uint8[] calldata selectedIndices
-	) external onlyCurrentPlayer returns (uint256) {
+	) external onlyCurrentPlayer notAfterGameOver returns (uint256) {
 		if (!dice.hasRolled) revert MustRollFirst();
 		if (selectedIndices.length == 0) revert MustSelectAtLeastOneDie();
 
@@ -114,20 +140,27 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 			dice.selectedMask = 0;
 			dice.availableCount = 6;
 			dice.hasRolled = false; // Player must roll again
+			hotDiceCounts[msg.sender]++;
 		}
 
 		emit DiceSelected(msg.sender, score);
 		return score;
 	}
 
-	function bank() external onlyCurrentPlayer {
+	function bank() external onlyCurrentPlayer notAfterGameOver {
 		if (!dice.hasRolled) revert MustRollAtLeastOnce();
 
 		// Bank the turn score
-		uint256 totalScore = dice.turnScore;
-		playerScores[players[currentPlayer]] += totalScore;
+		uint256 turnScore = dice.turnScore;
+		playerScores[players[currentPlayer]] += turnScore;
+		uint256 totalScore = playerScores[players[currentPlayer]];
 
-		emit Banked(msg.sender, totalScore);
+		emit Banked(msg.sender, turnScore, totalScore);
+		if (!finalTurn && totalScore > MAX_SCORE) {
+			finalTurn = true;
+			finalTurnPlayer = msg.sender;
+			emit FinalTurn();
+		}
 
 		// Reset for next player
 		_nextTurn();
@@ -280,13 +313,12 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 	}
 
 	function _farkle() internal {
-		// Farkle! Lose all turn points and end turn
+		farkleCounts[msg.sender]++;
 		emit Farkled(msg.sender);
 		_nextTurn();
 	}
 
 	function _nextTurn() internal {
-		// Reset dice state for next player
 		dice = DiceState({
 			values: 0,
 			selectedMask: 0,
@@ -294,9 +326,36 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 			turnScore: 0,
 			hasRolled: false
 		});
-
-		// Move to next player
 		currentPlayer = (currentPlayer + 1) % players.length;
+		if (finalTurn && players[currentPlayer] == finalTurnPlayer) {
+			_endGame();
+		}
+	}
+
+	function _endGame() internal {
+		gameEnded = true;
+		uint256 highestScore = 0;
+		for (uint256 i = 0; i < players.length; i++) {
+			address player = players[i];
+			uint256 score = playerScores[player];
+			if (score > highestScore) {
+				highestScore = score;
+				winner = player;
+			}
+		}
+		PlayerResult[] memory results = new PlayerResult[](players.length);
+		for (uint256 i = 0; i < players.length; i++) {
+			address player = players[i];
+			results[i] = PlayerResult({
+				player: player,
+				winner: (player == winner),
+				farkleCount: farkleCounts[player],
+				hotDiceCount: hotDiceCounts[player],
+				wager: entryFee
+			});
+		}
+		leaderboard.update(results);
+		emit GameOver(winner, highestScore);
 	}
 
 	function _packDiceValues(uint8[6] memory values) internal pure returns (uint48) {
