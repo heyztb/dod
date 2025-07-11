@@ -22,6 +22,9 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 	bool public gameEnded = false;
 	mapping(address => uint256) public farkleCounts;
 	mapping(address => uint256) public hotDiceCounts;
+	address public constant feeRecipient = 0x4e46f57817b3970a44aE4C32b04E80E17290e973;
+	uint256 public constant feeBasisPoints = 250;
+	uint256 public constant FEE_DENOMINATOR = 10000;
 
 	struct DiceState {
 		uint48 values; // Current dice values (1-6 each)
@@ -52,6 +55,9 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 	error MustSelectAtLeastOneDie();
 	error SelectionMustScorePoints();
 	error MustRollAtLeastOnce();
+	error NotEnoughEther();
+	error FeeTransferError();
+	error WinnerTransferError();
 
 	modifier onlyCurrentPlayer() {
 		if (msg.sender != players[currentPlayer]) revert NotCurrentPlayer();
@@ -72,7 +78,10 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 		address _leaderboard,
 		address[] calldata _players,
 		uint256 _entryFee
-	) external virtual initializer {
+	) external payable initializer {
+		if (msg.value != (_entryFee * players.length)) {
+			revert NotEnoughEther();
+		}
 		_initializeOwner(msg.sender);
 		room = IFarkleRoom(_room);
 		leaderboard = IFarkleLeaderboard(_leaderboard);
@@ -334,6 +343,7 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 
 	function _endGame() internal {
 		gameEnded = true;
+
 		uint256 highestScore = 0;
 		for (uint256 i = 0; i < players.length; i++) {
 			address player = players[i];
@@ -343,6 +353,7 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 				winner = player;
 			}
 		}
+
 		PlayerResult[] memory results = new PlayerResult[](players.length);
 		for (uint256 i = 0; i < players.length; i++) {
 			address player = players[i];
@@ -354,8 +365,23 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 				wager: entryFee
 			});
 		}
+
+		uint256 pot = address(this).balance;
+		uint256 feeAmount = (pot * feeBasisPoints) / FEE_DENOMINATOR;
+		uint256 winnings = pot - feeAmount;
+
 		leaderboard.update(results);
 		emit GameOver(winner, highestScore);
+
+		(bool feeSentSuccessfully, ) = feeRecipient.call{value: feeAmount}('');
+		if (!feeSentSuccessfully) {
+			revert FeeTransferError();
+		}
+
+		(bool winningsSentSuccesfully, ) = winner.call{value: winnings}('');
+		if (!winningsSentSuccesfully) {
+			revert WinnerTransferError();
+		}
 	}
 
 	function _packDiceValues(uint8[6] memory values) internal pure returns (uint48) {

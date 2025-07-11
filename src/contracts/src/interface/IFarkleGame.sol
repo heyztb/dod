@@ -7,7 +7,7 @@ interface IFarkleGame {
 		address _leaderboard,
 		address[] calldata _players,
 		uint256 _entryFee
-	) external;
+	) external payable;
 
 	// Core game functions
 	function roll() external;
