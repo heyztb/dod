@@ -4,8 +4,9 @@ pragma solidity ^0.8.30;
 import {IFarkleLeaderboard, PlayerResult, Stats} from '@interface/IFarkleLeaderboard.sol';
 import {Initializable} from '@solady/utils/Initializable.sol';
 import {Ownable} from '@solady/auth/Ownable.sol';
+import {UUPSUpgradeable} from '@solady/utils/UUPSUpgradeable.sol';
 
-contract FarkleLeaderboard is IFarkleLeaderboard, Initializable, Ownable {
+contract FarkleLeaderboard is IFarkleLeaderboard, Initializable, Ownable, UUPSUpgradeable {
 	mapping(address => Stats) public leaderboard;
 
 	constructor() {
@@ -16,15 +17,18 @@ contract FarkleLeaderboard is IFarkleLeaderboard, Initializable, Ownable {
 		_initializeOwner(msg.sender);
 	}
 
-	// TODO: Update function signature to accept player and stats
+	function _authorizeUpgrade(address) internal override onlyOwner {}
+
 	function update(PlayerResult[] calldata results) external onlyOwner {
 		uint256 totalWager = 0;
 		for (uint256 i = 0; i < results.length; i++) {
 			totalWager = totalWager + results[i].wager;
 		}
 
+		address[] memory players = new address[](results.length);
 		for (uint256 i = 0; i < results.length; i++) {
 			address player = results[i].player;
+			players[i] = player;
 			Stats storage _stats = leaderboard[player];
 			_stats.gamesPlayed = _stats.gamesPlayed + 1;
 			_stats.hotDiceRolled = _stats.hotDiceRolled + results[i].hotDiceCount;
@@ -41,6 +45,6 @@ contract FarkleLeaderboard is IFarkleLeaderboard, Initializable, Ownable {
 				_stats.currentWinStreak = 0;
 			}
 		}
-		emit LeaderboardUpdated(results);
+		emit LeaderboardUpdated(players);
 	}
 }

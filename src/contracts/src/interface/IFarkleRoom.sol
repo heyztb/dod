@@ -2,7 +2,7 @@
 pragma solidity ^0.8.30;
 
 interface IFarkleRoom {
-	function initialize(uint256 maxPlayers) external;
+	function initialize(uint256 maxPlayers, address _gameFactory) external;
 
 	function join() external;
 

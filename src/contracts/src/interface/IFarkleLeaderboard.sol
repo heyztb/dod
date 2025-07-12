@@ -21,7 +21,7 @@ struct PlayerResult {
 }
 
 interface IFarkleLeaderboard {
-	event LeaderboardUpdated(PlayerResult[] results);
+	event LeaderboardUpdated(address[] players);
 
 	function update(PlayerResult[] calldata results) external;
 }
