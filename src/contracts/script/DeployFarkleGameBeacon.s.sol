@@ -15,7 +15,6 @@ contract DeployFarkleGameBeacon is Script {
 		address deployer = msg.sender;
 
 		console.log('Deploying with account:', deployer);
-		console.log('Account balance:', deployer.balance);
 
 		// First deploy the implementation contract
 		FarkleGameImpl implementation = new FarkleGameImpl();
@@ -73,6 +72,6 @@ contract DeployFarkleGameBeacon is Script {
 
 	function salt() internal view returns (bytes32) {
 		// Generate a deterministic salt based on the current chain and deployer
-		return keccak256(abi.encodePacked(block.chainid, msg.sender, 'FarkleBeacon'));
+		return keccak256(abi.encodePacked(block.chainid, msg.sender, 'FarkleGameBeacon'));
 	}
 }
