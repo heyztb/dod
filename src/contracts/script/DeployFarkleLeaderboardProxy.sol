@@ -9,11 +9,13 @@ import {console} from 'forge-std/console.sol';
 contract DeployFarkleLeaderboardProxy is Script {
 	function run() external {
 		vm.startBroadcast();
+		// TODO: Replace with game factory address
+		address gameFactory = address(0);
 		address leaderboard = address(new FarkleLeaderboard());
 		console.log('Deploying FarkleLeaderboard at:', address(leaderboard));
 		address proxy = LibClone.deployERC1967(
 			leaderboard,
-			abi.encodeCall(FarkleLeaderboard.initialize, ())
+			abi.encodeCall(FarkleLeaderboard.initialize, (gameFactory))
 		);
 		console.log('Deploying FarkleLeaderboardProxy at:', address(proxy));
 		vm.stopBroadcast();

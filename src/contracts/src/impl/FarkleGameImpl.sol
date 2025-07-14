@@ -79,16 +79,12 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 		address[] calldata _players,
 		uint256 _entryFee
 	) external payable initializer {
-		if (msg.value != (_entryFee * players.length)) {
+		if (msg.value != (_entryFee * _players.length)) {
 			revert NotEnoughEther();
 		}
-		_initializeOwner(msg.sender);
 		room = IFarkleRoom(_room);
 		leaderboard = IFarkleLeaderboard(_leaderboard);
 		players = _players;
-		for (uint256 i = 0; i < _players.length; i++) {
-			playerScores[_players[i]] = 0;
-		}
 		entryFee = _entryFee;
 		dice = DiceState({
 			values: 0,
@@ -97,6 +93,7 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 			turnScore: 0,
 			hasRolled: false
 		});
+		renounceOwnership();
 	}
 
 	function roll() external override onlyCurrentPlayer notAfterGameOver {
@@ -370,7 +367,7 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 		uint256 feeAmount = (pot * feeBasisPoints) / FEE_DENOMINATOR;
 		uint256 winnings = pot - feeAmount;
 
-		leaderboard.update(results);
+		leaderboard.update(results, pot);
 		emit GameOver(winner, highestScore);
 
 		(bool feeSentSuccessfully, ) = feeRecipient.call{value: feeAmount}('');

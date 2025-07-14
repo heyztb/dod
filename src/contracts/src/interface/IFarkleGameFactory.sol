@@ -8,5 +8,7 @@ interface IFarkleGameFactory {
 		uint256 entryFee
 	) external payable returns (address);
 
+	function isGame(address game) external view returns (bool);
+
 	event GameCreated(address indexed game);
 }

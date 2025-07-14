@@ -9,11 +9,12 @@ import {IFarkleGame} from '@interface/IFarkleGame.sol';
 contract FarkleGameFactory is IFarkleGameFactory, Ownable {
 	address public immutable gameBeacon;
 	address public immutable leaderboard;
-	address[] public games;
+	mapping(address => bool) public games;
 
 	error InvalidGameBeacon();
 	error InvalidLeaderboard();
 	error InvalidPlayers();
+	error DuplicatePlayer();
 
 	constructor(address _gameBeacon, address _leaderboard) {
 		if (_gameBeacon == address(0) || _gameBeacon.code.length == 0) {
@@ -36,13 +37,24 @@ contract FarkleGameFactory is IFarkleGameFactory, Ownable {
 	) external payable returns (address) {
 		// need at least 2 players, but not more than 4
 		if (players.length < 2 || players.length > 4) revert InvalidPlayers();
+		for (uint256 i = 0; i < players.length; i++) {
+			for (uint j = i + 1; j < players.length; j++) {
+				if (players[i] == players[j]) {
+					revert DuplicatePlayer();
+				}
+			}
+		}
 		address game = LibClone.deployERC1967BeaconProxy(
 			entryFee * players.length,
 			gameBeacon,
 			abi.encodeCall(IFarkleGame.initialize, (room, leaderboard, players, entryFee))
 		);
-		games.push(game);
+		games[game] = true;
 		emit GameCreated(game);
 		return game;
+	}
+
+	function isGame(address game) external view returns (bool) {
+		return games[game];
 	}
 }

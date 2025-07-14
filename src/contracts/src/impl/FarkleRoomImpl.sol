@@ -17,12 +17,14 @@ contract FarkleRoomImpl is IFarkleRoom, Ownable, Initializable {
 	error AlreadyLeft();
 	error RoomFull();
 	error InvalidFactory();
+	error InvalidMaxPlayers();
 
 	constructor() {
 		_disableInitializers();
 	}
 
 	function initialize(uint256 _maxPlayers, address _gameFactory) external override initializer {
+		if (_maxPlayers < 2 || _maxPlayers > 4) revert InvalidMaxPlayers();
 		if (_gameFactory == address(0) || _gameFactory.code.length == 0) {
 			revert InvalidFactory();
 		}

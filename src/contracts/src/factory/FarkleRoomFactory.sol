@@ -8,21 +8,23 @@ import {LibClone} from '@solady/utils/LibClone.sol';
 
 contract FarkleRoomFactory is IFarkleRoomFactory, Ownable {
 	address public immutable roomBeacon;
+	address public gameFactory;
 
 	error InvalidMaxPlayers();
 
 	uint8 public constant MAX_PLAYERS = 4;
 
-	constructor(address _roomBeacon) {
+	constructor(address _roomBeacon, address _gameFactory) {
 		_initializeOwner(msg.sender);
 		roomBeacon = _roomBeacon;
+		gameFactory = _gameFactory;
 	}
 
 	function createRoom(uint256 maxPlayers) external override returns (address) {
 		if (maxPlayers == 0 || maxPlayers > MAX_PLAYERS) revert InvalidMaxPlayers();
 		address room = LibClone.deployERC1967BeaconProxy(
 			roomBeacon,
-			abi.encodeCall(IFarkleRoom.initialize, (maxPlayers))
+			abi.encodeCall(IFarkleRoom.initialize, (maxPlayers, gameFactory))
 		);
 		emit RoomCreated(room, maxPlayers);
 		return room;

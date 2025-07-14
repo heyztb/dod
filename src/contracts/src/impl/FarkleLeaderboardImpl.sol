@@ -5,30 +5,33 @@ import {IFarkleLeaderboard, PlayerResult, Stats} from '@interface/IFarkleLeaderb
 import {Initializable} from '@solady/utils/Initializable.sol';
 import {Ownable} from '@solady/auth/Ownable.sol';
 import {UUPSUpgradeable} from '@solady/utils/UUPSUpgradeable.sol';
+import {IFarkleGameFactory} from '@interface/IFarkleGameFactory.sol';
 
 contract FarkleLeaderboard is IFarkleLeaderboard, Initializable, Ownable, UUPSUpgradeable {
 	mapping(address => Stats) public leaderboard;
+	IFarkleGameFactory public gameFactory;
+
+	error NotGame();
+
+	modifier onlyGame() {
+		if (!gameFactory.isGame(msg.sender)) revert NotGame();
+		_;
+	}
 
 	constructor() {
 		_disableInitializers();
 	}
 
-	function initialize() public initializer {
+	function initialize(address _gameFactory) public initializer {
 		_initializeOwner(msg.sender);
+		gameFactory = IFarkleGameFactory(_gameFactory);
 	}
 
 	function _authorizeUpgrade(address) internal override onlyOwner {}
 
-	function update(PlayerResult[] calldata results) external onlyOwner {
-		uint256 totalWager = 0;
-		for (uint256 i = 0; i < results.length; i++) {
-			totalWager = totalWager + results[i].wager;
-		}
-
-		address[] memory players = new address[](results.length);
+	function update(PlayerResult[] calldata results, uint256 pot) external onlyGame {
 		for (uint256 i = 0; i < results.length; i++) {
 			address player = results[i].player;
-			players[i] = player;
 			Stats storage _stats = leaderboard[player];
 			_stats.gamesPlayed = _stats.gamesPlayed + 1;
 			_stats.hotDiceRolled = _stats.hotDiceRolled + results[i].hotDiceCount;
@@ -40,11 +43,11 @@ contract FarkleLeaderboard is IFarkleLeaderboard, Initializable, Ownable, UUPSUp
 				if (_stats.currentWinStreak > _stats.longestWinStreak) {
 					_stats.longestWinStreak = _stats.currentWinStreak;
 				}
-				_stats.totalWon = _stats.totalWon + totalWager;
+				_stats.totalWon = _stats.totalWon + pot;
 			} else {
 				_stats.currentWinStreak = 0;
 			}
 		}
-		emit LeaderboardUpdated(players);
+		emit LeaderboardUpdated(results);
 	}
 }
