@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {Ownable} from '@solady/auth/Ownable.sol';
 import {Initializable} from '@solady/utils/Initializable.sol';
 import {IFarkleGame} from '@interface/IFarkleGame.sol';
 import {IFarkleLeaderboard, PlayerResult} from '@interface/IFarkleLeaderboard.sol';
 import {IFarkleRoom} from '@interface/IFarkleRoom.sol';
+import {IFarkleTreasury} from '@interface/IFarkleTreasury.sol';
+import {VRFConsumerBaseV2Plus} from '@chainlink/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol';
+import {VRFV2PlusClient} from '@chainlink/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol';
 
-contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
+contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
 	string public constant VERSION = 'v1';
 	IFarkleRoom public room;
 	IFarkleLeaderboard public leaderboard;
+	IFarkleTreasury public treasury;
 	address[] public players;
 	uint256 public currentPlayer;
 	uint256 public entryFee;
@@ -22,9 +25,15 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 	bool public gameEnded = false;
 	mapping(address => uint256) public farkleCounts;
 	mapping(address => uint256) public hotDiceCounts;
-	address public constant feeRecipient = 0x4e46f57817b3970a44aE4C32b04E80E17290e973;
 	uint256 public constant feeBasisPoints = 250;
 	uint256 public constant FEE_DENOMINATOR = 10000;
+	uint256 s_subscriptionId =
+		110332509415864652465086222220959657000163978298414210005002692430465200668803;
+	bytes32 s_keyHash = 0x9e1344a1247c8a1785d0a4681a27152bffdb43666ae5bf7d14d24a5efd44bf71;
+	uint32 s_callbackGasLimit = 150000;
+	uint16 s_requestConfirmations = 1;
+	mapping(uint256 => address) public s_requestToPlayer;
+	mapping(address => bool) public s_rollInProgress;
 
 	struct DiceState {
 		uint48 values; // Current dice values (1-6 each)
@@ -37,7 +46,8 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 	DiceState public dice;
 
 	// Events
-	event DiceThrown(address indexed player, uint48 values);
+	event DiceThrown(address indexed player);
+	event DiceRolled(uint256 indexed requestId, address indexed player, uint48 values);
 	event DiceSelected(address indexed player, uint256 score);
 	event Banked(address indexed player, uint256 turnScore, uint256 totalScore);
 	event Farkled(address indexed player);
@@ -45,10 +55,12 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 	event GameOver(address indexed winner, uint256 score);
 
 	// Errors
+	error InvalidTreasury();
 	error NotCurrentPlayer();
 	error GameAlreadyOver();
 	error InvalidSelection();
 	error MustRollFirst();
+	error RollInProgress();
 	error DiceAlreadySelected();
 	error NoScoringDice();
 	error NoDiceAvailable();
@@ -69,7 +81,11 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 		_;
 	}
 
-	constructor() {
+	constructor(address _vrfCoordinator, address _treasury) VRFConsumerBaseV2Plus(_vrfCoordinator) {
+		if (_vrfCoordinator == address(0)) revert ZeroAddress();
+		if (_treasury == address(0)) revert ZeroAddress();
+		if (_treasury.code.length == 0) revert InvalidTreasury();
+		treasury = IFarkleTreasury(_treasury);
 		_disableInitializers();
 	}
 
@@ -93,21 +109,55 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 			turnScore: 0,
 			hasRolled: false
 		});
-		renounceOwnership();
+		transferOwnership(address(0));
 	}
 
 	function roll() external override onlyCurrentPlayer notAfterGameOver {
 		if (dice.availableCount == 0) revert NoDiceAvailable();
 
-		// Generate new dice values, preserving selected dice
-		uint8[6] memory newValues = _rollAvailableDice();
+		if (s_rollInProgress[msg.sender]) revert RollInProgress();
+		s_rollInProgress[msg.sender] = true;
+
+		uint256 requestId = s_vrfCoordinator.requestRandomWords(
+			VRFV2PlusClient.RandomWordsRequest({
+				keyHash: s_keyHash,
+				subId: s_subscriptionId,
+				requestConfirmations: s_requestConfirmations,
+				callbackGasLimit: s_callbackGasLimit,
+				numWords: 1,
+				extraArgs: VRFV2PlusClient._argsToBytes(
+					VRFV2PlusClient.ExtraArgsV1({nativePayment: false})
+				)
+			})
+		);
+
+		s_requestToPlayer[requestId] = msg.sender;
+		emit DiceThrown(msg.sender);
+	}
+
+	function fulfillRandomWords(
+		uint256 requestId,
+		uint256[] calldata randomWords
+	) internal virtual override {
+		address player = s_requestToPlayer[requestId];
+		require(player != address(0), 'Request not found');
+		s_rollInProgress[player] = false;
+		uint256 randomValue = randomWords[0];
+		uint8[6] memory newValues = _unpackDiceValues(dice.values);
+
+		for (uint256 i = 0; i < 6; i++) {
+			if ((dice.selectedMask & (1 << i)) == 0) {
+				newValues[i] = uint8((randomValue >> (i * 8)) % 6) + 1;
+			}
+		}
+
 		dice.values = _packDiceValues(newValues);
 		dice.hasRolled = true;
 
-		emit DiceThrown(msg.sender, dice.values);
-		// Check for farkle (no scoring dice among the newly rolled dice)
+		emit DiceRolled(requestId, player, dice.values);
+
 		if (!_hasAnyScore(newValues)) {
-			_farkle();
+			_farkle(player);
 		}
 	}
 
@@ -318,9 +368,9 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 		return false;
 	}
 
-	function _farkle() internal {
-		farkleCounts[msg.sender]++;
-		emit Farkled(msg.sender);
+	function _farkle(address player) internal {
+		farkleCounts[player]++;
+		emit Farkled(player);
 		_nextTurn();
 	}
 
@@ -370,7 +420,7 @@ contract FarkleGameImpl is IFarkleGame, Ownable, Initializable {
 		leaderboard.update(results, pot);
 		emit GameOver(winner, highestScore);
 
-		(bool feeSentSuccessfully, ) = feeRecipient.call{value: feeAmount}('');
+		(bool feeSentSuccessfully, ) = address(treasury).call{value: feeAmount}('');
 		if (!feeSentSuccessfully) {
 			revert FeeTransferError();
 		}
