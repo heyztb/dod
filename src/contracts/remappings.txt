@@ -2,3 +2,4 @@
 @solady/=dependencies/solady-0.1.19/src
 forge-std-1.9.7/=dependencies/forge-std-1.9.7/
 @chainlink/=dependencies/chainlink-evm/contracts/
+@openzeppelin/=dependencies/openzeppelin-contracts/contracts/

@@ -1,4 +1,6 @@
-// SPDX-License-Identifier: AGPL
+// SPDX-License-Identifier: AGPL-3.0-only
+/// @title FarkleLeaderboardImpl.sol
+/// @author heyztb.eth
 pragma solidity ^0.8.30;
 
 import {IFarkleLeaderboard, PlayerResult, Stats} from '@interface/IFarkleLeaderboard.sol';

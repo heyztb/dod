@@ -1,4 +1,6 @@
-// SPDX-License-Identifier: AGPL
+// SPDX-License-Identifier: AGPL-3.0-only
+/// @title IFarkleLeaderboard.sol
+/// @author heyztb.eth
 pragma solidity ^0.8.30;
 
 struct Stats {

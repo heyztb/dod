@@ -1,4 +1,6 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-only
+/// @title FarkleGameImpl.sol
+/// @author heyztb.eth
 pragma solidity ^0.8.30;
 
 import {Initializable} from '@solady/utils/Initializable.sol';
@@ -8,6 +10,7 @@ import {IFarkleRoom} from '@interface/IFarkleRoom.sol';
 import {IFarkleTreasury} from '@interface/IFarkleTreasury.sol';
 import {VRFConsumerBaseV2Plus} from '@chainlink/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol';
 import {VRFV2PlusClient} from '@chainlink/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol';
+import {IERC20} from '@openzeppelin/token/ERC20/IERC20.sol';
 
 contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
 	string public constant VERSION = 'v1';
@@ -16,6 +19,7 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
 	IFarkleTreasury public treasury;
 	address[] public players;
 	uint256 public currentPlayer;
+	address public token;
 	uint256 public entryFee;
 	mapping(address => uint256) public playerScores;
 	uint256 public constant MAX_SCORE = 10_000;
@@ -68,6 +72,7 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
 	error SelectionMustScorePoints();
 	error MustRollAtLeastOnce();
 	error NotEnoughEther();
+	error WantERC20NotETH();
 	error FeeTransferError();
 	error WinnerTransferError();
 
@@ -93,10 +98,19 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
 		address _room,
 		address _leaderboard,
 		address[] calldata _players,
+		address _token,
 		uint256 _entryFee
 	) external payable initializer {
-		if (msg.value != (_entryFee * _players.length)) {
-			revert NotEnoughEther();
+		if (_token == address(0)) {
+			if (msg.value != (_entryFee * _players.length)) {
+				revert NotEnoughEther();
+			}
+		} else {
+			if (msg.value != 0) revert WantERC20NotETH();
+			token = _token;
+			for (uint256 i = 0; i < _players.length; i++) {
+				IERC20(_token).transferFrom(_players[i], address(this), _entryFee);
+			}
 		}
 		room = IFarkleRoom(_room);
 		leaderboard = IFarkleLeaderboard(_leaderboard);
@@ -413,22 +427,38 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
 			});
 		}
 
-		uint256 pot = address(this).balance;
-		uint256 feeAmount = (pot * feeBasisPoints) / FEE_DENOMINATOR;
-		uint256 winnings = pot - feeAmount;
+		uint256 pot;
+		if (token == address(0)) {
+			pot = address(this).balance;
+			uint256 feeAmount = (pot * feeBasisPoints) / FEE_DENOMINATOR;
+			uint256 winnings = pot - feeAmount;
+			leaderboard.update(results, pot);
+			(bool feeSentSuccessfully, ) = address(treasury).call{value: feeAmount}('');
+			if (!feeSentSuccessfully) {
+				revert FeeTransferError();
+			}
+
+			(bool winningsSentSuccesfully, ) = winner.call{value: winnings}('');
+			if (!winningsSentSuccesfully) {
+				revert WinnerTransferError();
+			}
+		} else {
+			pot = IERC20(token).balanceOf(address(this));
+			uint256 feeAmount = (pot * feeBasisPoints) / FEE_DENOMINATOR;
+			uint256 winnings = pot - feeAmount;
+			bool feeSentSuccessfully = IERC20(token).transfer(address(treasury), feeAmount);
+			if (!feeSentSuccessfully) {
+				revert FeeTransferError();
+			}
+
+			bool winningsSentSuccesfully = IERC20(token).transfer(winner, winnings);
+			if (!winningsSentSuccesfully) {
+				revert WinnerTransferError();
+			}
+		}
 
 		leaderboard.update(results, pot);
 		emit GameOver(winner, highestScore);
-
-		(bool feeSentSuccessfully, ) = address(treasury).call{value: feeAmount}('');
-		if (!feeSentSuccessfully) {
-			revert FeeTransferError();
-		}
-
-		(bool winningsSentSuccesfully, ) = winner.call{value: winnings}('');
-		if (!winningsSentSuccesfully) {
-			revert WinnerTransferError();
-		}
 	}
 
 	function _packDiceValues(uint8[6] memory values) internal pure returns (uint48) {
