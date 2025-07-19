@@ -15,6 +15,9 @@ contract FarkleTreasuryImpl is IFarkleTreasury, Initializable, Ownable, UUPSUpgr
 	event EthWithdrawn(address indexed receiver, uint256 amount);
 	event ERC20Withdrawn(address indexed receiver, address indexed token, uint256 amount);
 
+	error ETHTransferError(address to, uint256 amount);
+	error ERC20TransferError(address token, address to, uint256 amount);
+
 	constructor() {
 		_disableInitializers();
 	}
@@ -31,7 +34,7 @@ contract FarkleTreasuryImpl is IFarkleTreasury, Initializable, Ownable, UUPSUpgr
 
 	function withdraw(uint256 amount) public override onlyOwner {
 		(bool success, ) = payable(msg.sender).call{value: amount}('');
-		require(success, 'Transfer failed');
+		if (!success) revert ETHTransferError(msg.sender, amount);
 		emit EthWithdrawn(msg.sender, amount);
 	}
 
@@ -40,8 +43,11 @@ contract FarkleTreasuryImpl is IFarkleTreasury, Initializable, Ownable, UUPSUpgr
 	}
 
 	function withdrawERC20(address token, uint256 amount) public override onlyOwner {
-		bool success = IERC20(token).transfer(msg.sender, amount);
-		require(success, 'Transfer failed');
+		try IERC20(token).transfer(msg.sender, amount) returns (bool success) {
+			if (!success) revert ERC20TransferError(token, msg.sender, amount);
+		} catch {
+			revert ERC20TransferError(token, msg.sender, amount);
+		}
 		emit ERC20Withdrawn(msg.sender, token, amount);
 	}
 

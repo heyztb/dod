@@ -59,6 +59,7 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
 	event GameOver(address indexed winner, uint256 score);
 
 	// Errors
+	error InvalidToken();
 	error InvalidTreasury();
 	error NotCurrentPlayer();
 	error GameAlreadyOver();
@@ -73,6 +74,7 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
 	error MustRollAtLeastOnce();
 	error NotEnoughEther();
 	error WantERC20NotETH();
+	error ERC20TransferFromError(address player);
 	error FeeTransferError();
 	error WinnerTransferError();
 
@@ -109,7 +111,13 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
 			if (msg.value != 0) revert WantERC20NotETH();
 			token = _token;
 			for (uint256 i = 0; i < _players.length; i++) {
-				IERC20(_token).transferFrom(_players[i], address(this), _entryFee);
+				try IERC20(_token).transferFrom(_players[i], address(this), _entryFee) returns (
+					bool success
+				) {
+					if (!success) revert ERC20TransferFromError(_players[i]);
+				} catch {
+					revert ERC20TransferFromError(_players[i]);
+				}
 			}
 		}
 		room = IFarkleRoom(_room);
@@ -443,16 +451,24 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
 				revert WinnerTransferError();
 			}
 		} else {
-			pot = IERC20(token).balanceOf(address(this));
+			try IERC20(token).balanceOf(address(this)) returns (uint256 _pot) {
+				pot = _pot;
+			} catch {
+				revert InvalidToken();
+			}
 			uint256 feeAmount = (pot * feeBasisPoints) / FEE_DENOMINATOR;
 			uint256 winnings = pot - feeAmount;
-			bool feeSentSuccessfully = IERC20(token).transfer(address(treasury), feeAmount);
-			if (!feeSentSuccessfully) {
+			try IERC20(token).transfer(address(treasury), feeAmount) returns (
+				bool feeSentSuccessfully
+			) {
+				if (!feeSentSuccessfully) revert FeeTransferError();
+			} catch {
 				revert FeeTransferError();
 			}
 
-			bool winningsSentSuccesfully = IERC20(token).transfer(winner, winnings);
-			if (!winningsSentSuccesfully) {
+			try IERC20(token).transfer(winner, winnings) returns (bool winningsSentSuccesfully) {
+				if (!winningsSentSuccesfully) revert WinnerTransferError();
+			} catch {
 				revert WinnerTransferError();
 			}
 		}
