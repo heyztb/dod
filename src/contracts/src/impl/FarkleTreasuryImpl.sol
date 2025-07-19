@@ -52,6 +52,10 @@ contract FarkleTreasuryImpl is IFarkleTreasury, Initializable, Ownable, UUPSUpgr
 	}
 
 	function withdrawAllERC20(address token) public override onlyOwner {
-		withdrawERC20(token, IERC20(token).balanceOf(address(this)));
+		try IERC20(token).balanceOf(address(this)) returns (uint256 amount) {
+			withdrawERC20(token, amount);
+		} catch {
+			revert ERC20TransferError(token, msg.sender, 0);
+		}
 	}
 }
