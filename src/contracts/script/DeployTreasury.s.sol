@@ -16,7 +16,7 @@ contract DeployTreasury is Script {
 			address(treasuryImpl),
 			abi.encodeCall(IFarkleTreasury.initialize, ())
 		);
-		console.log('Deployed Treasury UUPS proxy at:', address(treasury));
+		console.log('FarkleTreasury deployed at:', address(treasury));
 		vm.stopBroadcast();
 	}
 }
