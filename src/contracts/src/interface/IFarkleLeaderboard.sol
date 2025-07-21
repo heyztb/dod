@@ -6,8 +6,10 @@ pragma solidity ^0.8.30;
 struct Stats {
 	uint256 gamesPlayed;
 	uint256 gamesWon;
-	uint256 totalWagered;
-	uint256 totalWon;
+	uint256 totalEthWagered;
+	uint256 totalEthWon;
+	mapping(address => uint256) erc20Wagered;
+	mapping(address => uint256) erc20Won;
 	uint256 longestWinStreak;
 	uint256 currentWinStreak;
 	uint256 farklesRolled;
@@ -25,5 +27,5 @@ struct PlayerResult {
 interface IFarkleLeaderboard {
 	event LeaderboardUpdated(PlayerResult[] results);
 
-	function update(PlayerResult[] calldata results, uint256 pot) external;
+	function update(PlayerResult[] calldata results, address token, uint256 pot) external;
 }

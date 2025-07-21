@@ -31,21 +31,29 @@ contract FarkleLeaderboard is IFarkleLeaderboard, Initializable, Ownable, UUPSUp
 
 	function _authorizeUpgrade(address) internal override onlyOwner {}
 
-	function update(PlayerResult[] calldata results, uint256 pot) external onlyGame {
+	function update(PlayerResult[] calldata results, address token, uint256 pot) external onlyGame {
 		for (uint256 i = 0; i < results.length; i++) {
 			address player = results[i].player;
 			Stats storage _stats = leaderboard[player];
 			_stats.gamesPlayed = _stats.gamesPlayed + 1;
 			_stats.hotDiceRolled = _stats.hotDiceRolled + results[i].hotDiceCount;
 			_stats.farklesRolled = _stats.farklesRolled + results[i].farkleCount;
-			_stats.totalWagered = _stats.totalWagered + results[i].wager;
+			if (token == address(0)) {
+				_stats.totalEthWagered = _stats.totalEthWagered + results[i].wager;
+			} else {
+				_stats.erc20Wagered[token] = _stats.erc20Wagered[token] + results[i].wager;
+			}
 			if (results[i].winner) {
 				_stats.gamesWon = _stats.gamesWon + 1;
 				_stats.currentWinStreak = _stats.currentWinStreak + 1;
 				if (_stats.currentWinStreak > _stats.longestWinStreak) {
 					_stats.longestWinStreak = _stats.currentWinStreak;
 				}
-				_stats.totalWon = _stats.totalWon + pot;
+				if (token == address(0)) {
+					_stats.totalEthWon = _stats.totalEthWon + pot;
+				} else {
+					_stats.erc20Won[token] = _stats.erc20Won[token] + pot;
+				}
 			} else {
 				_stats.currentWinStreak = 0;
 			}

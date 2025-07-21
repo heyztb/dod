@@ -440,7 +440,6 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
 			pot = address(this).balance;
 			uint256 feeAmount = (pot * feeBasisPoints) / FEE_DENOMINATOR;
 			uint256 winnings = pot - feeAmount;
-			leaderboard.update(results, pot);
 			(bool feeSentSuccessfully, ) = address(treasury).call{value: feeAmount}('');
 			if (!feeSentSuccessfully) {
 				revert FeeTransferError();
@@ -473,7 +472,7 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
 			}
 		}
 
-		leaderboard.update(results, pot);
+		leaderboard.update(results, token, pot);
 		emit GameOver(winner, highestScore);
 	}
 
