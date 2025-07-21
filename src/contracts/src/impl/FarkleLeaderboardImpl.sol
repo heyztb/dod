@@ -39,7 +39,7 @@ contract FarkleLeaderboard is IFarkleLeaderboard, Initializable, Ownable, UUPSUp
 			_stats.hotDiceRolled = _stats.hotDiceRolled + results[i].hotDiceCount;
 			_stats.farklesRolled = _stats.farklesRolled + results[i].farkleCount;
 			if (token == address(0)) {
-				_stats.totalEthWagered = _stats.totalEthWagered + results[i].wager;
+				_stats.ethWagered = _stats.ethWagered + results[i].wager;
 			} else {
 				_stats.erc20Wagered[token] = _stats.erc20Wagered[token] + results[i].wager;
 			}
@@ -50,7 +50,7 @@ contract FarkleLeaderboard is IFarkleLeaderboard, Initializable, Ownable, UUPSUp
 					_stats.longestWinStreak = _stats.currentWinStreak;
 				}
 				if (token == address(0)) {
-					_stats.totalEthWon = _stats.totalEthWon + pot;
+					_stats.ethWon = _stats.ethWon + pot;
 				} else {
 					_stats.erc20Won[token] = _stats.erc20Won[token] + pot;
 				}
@@ -58,6 +58,6 @@ contract FarkleLeaderboard is IFarkleLeaderboard, Initializable, Ownable, UUPSUp
 				_stats.currentWinStreak = 0;
 			}
 		}
-		emit LeaderboardUpdated(results);
+		emit LeaderboardUpdated(token, results);
 	}
 }
