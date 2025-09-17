@@ -1,0 +1,32 @@
+{
+    "accountAssociation": {
+        "header": "eyJmaWQiOjk3OTI4NCwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweGEzRmYxMTE3Njc2RkM3RjVkMUQ4YkExNzUxN0JGM2FkOGFhOTRFMTEifQ",
+        "payload": "eyJkb21haW4iOiJkb2QuenRiLmRldiJ9",
+        "signature":
+            "MHhkZjQwOTJhZjJlMmY0MTkzNDRmOTc0MDQwZjM0OGQ0MDQ1NzM0MmIyNTVhMDQ2MTcwOGVjYWYzZjhmMGFjMGM1NTI2MjMwYjE2ZDJjMTU0ZTg1OWExMTY2NmIwMTQxNjNiNWIyMmU1YjJhNWZkNDczMTc4NGRlNTM4ZWMyMmIwMTFj"
+    },
+    "frame": {
+        "version": "1",
+        "name": "Dice of Destiny",
+        "description":
+            "A social dice game on Farcaster. Farkle is a game of strategy and chance. Roll the dice and realize your fate.",
+        "subtitle": "Social dice game on Farcaster",
+        "homeUrl": "https://dod.ztb.dev",
+        "iconUrl": "https://dod.ztb.dev/favicon.png",
+        "primaryCategory": "games",
+        "tags": ["game", "strategy", "chance", "social", "multiplayer"],
+        "splashBackgroundColor": "#ffffff",
+        "splashImageUrl": "https://dod.ztb.dev/favicon.png",
+        "tagline": "Realize your fate",
+        "ogTitle": "Dice of Destiny",
+        "ogDescription":
+            "A social dice game on Farcaster. Farkle is a game of strategy and chance. Realize your fate today.",
+        "ogImageUrl": "https://dod.ztb.dev/favicon.png",
+        "noindex": false,
+        "requiredChains": ["eip155:8453", "eip155:84532"],
+        "requriedCapabilities": ["wallet.getEthereumProvider"]
+    },
+    "baseBuilder": {
+        "allowedAddresses": ["0x58FEF4aA757Bd5f5a72b5613348F0B6073617865"]
+    }
+}

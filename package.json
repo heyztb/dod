@@ -1,0 +1,59 @@
+{
+    "name": "dod-bhvr",
+    "version": "0.4.0",
+    "description": "A monorepo template built with Bun, Hono, Vite, and React",
+    "author": "Steve Simkins",
+    "license": "MIT",
+    "homepage": "https://github.com/stevedylandev/bhvr",
+    "packageManager": "bun@1.2.4",
+    "workspaces": [
+        "./server",
+        "./client",
+        "./shared"
+    ],
+    "scripts": {
+        "dev": "turbo dev",
+        "dev:client": "turbo dev --filter=client",
+        "dev:server": "turbo dev --filter=server",
+        "build": "turbo build",
+        "build:client": "turbo build --filter=client",
+        "build:server": "turbo build --filter=server",
+        "build:single": "bun run build && bun run copy:static && bun run build:server",
+        "copy:static": "rm -rf server/static && cp -r client/dist server/static",
+        "start:single": "cd server && bun run dist/index.js",
+        "lint": "turbo lint",
+        "type-check": "turbo type-check",
+        "test": "turbo test",
+        "postinstall": "turbo build --filter=shared --filter=server"
+        "deploy": "turbo build && wrangler deploy --minify"
+    },
+    "keywords": [
+        "bun",
+        "hono",
+        "react",
+        "vite",
+        "monorepo",
+        "turbo"
+    ],
+    "devDependencies": {
+        "@cloudflare/workers-types": "^4.20250917.0",
+        "@eslint/css": "^0.11.0",
+        "@eslint/js": "^9.35.0",
+        "@eslint/json": "^0.13.2",
+        "@eslint/markdown": "^7.2.0",
+        "bun-types": "latest",
+        "eslint": "^9.35.0",
+        "eslint-plugin-react": "^7.37.5",
+        "globals": "^16.4.0",
+        "jiti": "^2.5.1",
+        "turbo": "^2.5.6",
+        "typescript-eslint": "^8.44.0",
+        "wrangler": "^4.37.1"
+    },
+    "peerDependencies": {
+        "typescript": "^5.8.3"
+    },
+    "dependencies": {
+        "hono": "^4.9.7"
+    }
+}
