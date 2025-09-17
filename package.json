@@ -18,13 +18,10 @@
         "build": "turbo build",
         "build:client": "turbo build --filter=client",
         "build:server": "turbo build --filter=server",
-        "build:single": "bun run build && bun run copy:static && bun run build:server",
-        "copy:static": "rm -rf server/static && cp -r client/dist server/static",
-        "start:single": "cd server && bun run dist/index.js",
         "lint": "turbo lint",
         "type-check": "turbo type-check",
         "test": "turbo test",
-        "postinstall": "turbo build --filter=shared --filter=server"
+        "postinstall": "turbo build --filter=shared --filter=server",
         "deploy": "turbo build && wrangler deploy --minify"
     },
     "keywords": [
