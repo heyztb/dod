@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { trimTrailingSlash } from "hono/trailing-slash";
 import type { ApiResponse } from "shared/dist";
+import { quickAuthMiddleware } from "./quickAuthMiddleware";
 
 export const app = new Hono()
     .use(cors())
@@ -18,6 +19,9 @@ export const app = new Hono()
             success: true,
         };
         return c.json(data, { status: 200 });
-    });
+    })
+    .get("/me", quickAuthMiddleware, (c) => {
+        return c.json(c.get("user"))
+    })
 
 export default app;

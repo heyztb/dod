@@ -6,7 +6,6 @@ pragma solidity ^0.8.30;
 import {Initializable} from "solady/utils/Initializable.sol";
 import {IFarkleGame} from "src/interface/IFarkleGame.sol";
 import {IFarkleLeaderboard, PlayerResult} from "src/interface/IFarkleLeaderboard.sol";
-import {IFarkleRoom} from "src/interface/IFarkleRoom.sol";
 import {IFarkleTreasury} from "src/interface/IFarkleTreasury.sol";
 import {VRFConsumerBaseV2Plus} from "chainlink/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "chainlink/vrf/dev/libraries/VRFV2PlusClient.sol";
@@ -14,9 +13,13 @@ import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 
 contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
     string public constant VERSION = "v1";
-    IFarkleRoom public room;
-    IFarkleLeaderboard public leaderboard;
-    IFarkleTreasury public treasury;
+    // TODO: Update these addresses before deployment
+    IFarkleLeaderboard public constant leaderboard =
+        IFarkleLeaderboard(address(0x0000000000000000));
+    IFarkleTreasury public constant treasury =
+        IFarkleTreasury(address(0x0000000000000000));
+    bool public startable = true;
+    address public host;
     address[] public players;
     uint256 public currentPlayer;
     address public token;
@@ -50,7 +53,10 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
 
     DiceState public dice;
 
-    // Events
+    event PlayerJoined(address indexed player);
+    event PlayerLeft(address indexed player);
+    event GameStarted();
+    event GameClosed();
     event DiceThrown(address indexed player);
     event DiceRolled(
         uint256 indexed requestId,
@@ -61,9 +67,15 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
     event Banked(address indexed player, uint256 turnScore, uint256 totalScore);
     event Farkled(address indexed player);
     event FinalTurn();
+    event PlayerWon(address indexed player, address token, uint256 amount);
     event GameOver(address indexed winner, uint256 score);
 
-    // Errors
+    error AlreadyJoined();
+    error GameFull();
+    error NotInGame();
+    error MustBeHost();
+    error GameNotStarted();
+    error GameAlreadyStarted();
     error InvalidToken();
     error InvalidTreasury();
     error NotCurrentPlayer();
@@ -80,11 +92,23 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
     error NotEnoughEther();
     error WantERC20NotETH();
     error ERC20TransferFromError(address player);
+    error ERC20TransferError(address player);
     error FeeTransferError();
+    error RefundTransferError();
     error WinnerTransferError();
 
     modifier onlyCurrentPlayer() {
         if (msg.sender != players[currentPlayer]) revert NotCurrentPlayer();
+        _;
+    }
+
+    modifier notBeforeGameStart() {
+        if (startable) revert GameNotStarted();
+        _;
+    }
+
+    modifier notAfterGameStart() {
+        if (!startable) revert GameAlreadyStarted();
         _;
     }
 
@@ -93,48 +117,23 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
         _;
     }
 
+    modifier onlyHost() {
+        if (msg.sender != host) revert MustBeHost();
+        _;
+    }
+
     constructor(
-        address _vrfCoordinator,
-        address _treasury
+        address _vrfCoordinator
     ) VRFConsumerBaseV2Plus(_vrfCoordinator) {
         if (_vrfCoordinator == address(0)) revert ZeroAddress();
-        if (_treasury == address(0)) revert ZeroAddress();
-        if (_treasury.code.length == 0) revert InvalidTreasury();
-        treasury = IFarkleTreasury(_treasury);
         _disableInitializers();
     }
 
     function initialize(
-        address _room,
-        address _leaderboard,
-        address[] calldata _players,
         address _token,
         uint256 _entryFee
-    ) external payable initializer {
-        if (_token == address(0)) {
-            if (msg.value != (_entryFee * _players.length)) {
-                revert NotEnoughEther();
-            }
-        } else {
-            if (msg.value != 0) revert WantERC20NotETH();
-            token = _token;
-            for (uint256 i = 0; i < _players.length; i++) {
-                try
-                    IERC20(_token).transferFrom(
-                        _players[i],
-                        address(this),
-                        _entryFee
-                    )
-                returns (bool success) {
-                    if (!success) revert ERC20TransferFromError(_players[i]);
-                } catch {
-                    revert ERC20TransferFromError(_players[i]);
-                }
-            }
-        }
-        room = IFarkleRoom(_room);
-        leaderboard = IFarkleLeaderboard(_leaderboard);
-        players = _players;
+    ) external initializer {
+        token = _token;
         entryFee = _entryFee;
         dice = DiceState({
             values: 0,
@@ -146,7 +145,13 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
         transferOwnership(address(0));
     }
 
-    function roll() external override onlyCurrentPlayer notAfterGameOver {
+    function roll()
+        external
+        override
+        onlyCurrentPlayer
+        notBeforeGameStart
+        notAfterGameOver
+    {
         if (dice.availableCount == 0) revert NoDiceAvailable();
 
         if (s_rollInProgress[msg.sender]) revert RollInProgress();
@@ -197,7 +202,13 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
 
     function selectDice(
         uint8[] calldata selectedIndices
-    ) external onlyCurrentPlayer notAfterGameOver returns (uint256) {
+    )
+        external
+        onlyCurrentPlayer
+        notBeforeGameStart
+        notAfterGameOver
+        returns (uint256)
+    {
         if (!dice.hasRolled) revert MustRollFirst();
         if (selectedIndices.length == 0) revert MustSelectAtLeastOneDie();
 
@@ -241,7 +252,12 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
         return score;
     }
 
-    function bank() external onlyCurrentPlayer notAfterGameOver {
+    function bank()
+        external
+        onlyCurrentPlayer
+        notBeforeGameStart
+        notAfterGameOver
+    {
         if (!dice.hasRolled) revert MustRollAtLeastOnce();
 
         // Bank the turn score
@@ -459,47 +475,58 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
         }
 
         uint256 pot;
-        if (token == address(0)) {
-            pot = address(this).balance;
-            uint256 feeAmount = (pot * feeBasisPoints) / FEE_DENOMINATOR;
-            uint256 winnings = pot - feeAmount;
-            (bool feeSentSuccessfully, ) = address(treasury).call{
-                value: feeAmount
-            }("");
-            if (!feeSentSuccessfully) {
-                revert FeeTransferError();
+        uint256 winnings;
+        if (entryFee > 0) {
+            if (token == address(0)) {
+                pot = address(this).balance;
+                uint256 feeAmount = (pot * feeBasisPoints) / FEE_DENOMINATOR;
+                winnings = pot - feeAmount;
+                (bool feeSentSuccessfully, ) = payable(address(treasury)).call{
+                    value: feeAmount
+                }("");
+                if (!feeSentSuccessfully) {
+                    revert FeeTransferError();
+                }
+
+                (bool winningsSentSuccesfully, ) = payable(winner).call{
+                    value: winnings
+                }("");
+                if (!winningsSentSuccesfully) {
+                    revert WinnerTransferError();
+                }
+            } else {
+                try IERC20(token).balanceOf(address(this)) returns (
+                    uint256 _pot
+                ) {
+                    pot = _pot;
+                } catch {
+                    revert InvalidToken();
+                }
+                uint256 feeAmount = (pot * feeBasisPoints) / FEE_DENOMINATOR;
+                winnings = pot - feeAmount;
+                try
+                    IERC20(token).transfer(address(treasury), feeAmount)
+                returns (bool feeSentSuccessfully) {
+                    if (!feeSentSuccessfully) revert FeeTransferError();
+                } catch {
+                    revert FeeTransferError();
+                }
+
+                try IERC20(token).transfer(winner, winnings) returns (
+                    bool winningsSentSuccesfully
+                ) {
+                    if (!winningsSentSuccesfully) revert WinnerTransferError();
+                } catch {
+                    revert WinnerTransferError();
+                }
             }
 
-            (bool winningsSentSuccesfully, ) = winner.call{value: winnings}("");
-            if (!winningsSentSuccesfully) {
-                revert WinnerTransferError();
-            }
+            leaderboard.update(results, token, pot);
+            emit PlayerWon(winner, token, winnings);
         } else {
-            try IERC20(token).balanceOf(address(this)) returns (uint256 _pot) {
-                pot = _pot;
-            } catch {
-                revert InvalidToken();
-            }
-            uint256 feeAmount = (pot * feeBasisPoints) / FEE_DENOMINATOR;
-            uint256 winnings = pot - feeAmount;
-            try IERC20(token).transfer(address(treasury), feeAmount) returns (
-                bool feeSentSuccessfully
-            ) {
-                if (!feeSentSuccessfully) revert FeeTransferError();
-            } catch {
-                revert FeeTransferError();
-            }
-
-            try IERC20(token).transfer(winner, winnings) returns (
-                bool winningsSentSuccesfully
-            ) {
-                if (!winningsSentSuccesfully) revert WinnerTransferError();
-            } catch {
-                revert WinnerTransferError();
-            }
+            leaderboard.update(results, address(0), 0);
+            emit PlayerWon(winner, address(0), 0);
         }
-
-        leaderboard.update(results, token, pot);
         emit GameOver(winner, highestScore);
     }
 
@@ -538,5 +565,90 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
 
     function getAvailableCount() external view returns (uint8) {
         return dice.availableCount;
+    }
+
+    function join() external payable notAfterGameStart {
+        if (players.length == 4) {
+            revert GameFull();
+        }
+
+        if (entryFee > 0) {
+            if (token == address(0)) {
+                if (msg.value != entryFee) revert NotEnoughEther();
+            } else {
+                if (msg.value != 0) revert WantERC20NotETH();
+                try
+                    IERC20(token).transferFrom(
+                        msg.sender,
+                        address(this),
+                        entryFee
+                    )
+                returns (bool success) {
+                    if (!success) revert ERC20TransferFromError(msg.sender);
+                } catch {
+                    revert ERC20TransferFromError(msg.sender);
+                }
+            }
+        }
+
+        for (uint256 i = 0; i < players.length; i++) {
+            if (players[i] == msg.sender) {
+                revert AlreadyJoined();
+            }
+        }
+        players.push(msg.sender);
+        if (players.length == 1) {
+            host = msg.sender;
+        }
+        emit PlayerJoined(msg.sender);
+    }
+
+    function leave() external notAfterGameStart {
+        for (uint256 i = 0; i < players.length; i++) {
+            if (players[i] == msg.sender) {
+                // if this is not the last player
+                if (i < players.length - 1) {
+                    // swap them with the last player
+                    players[i] = players[players.length - 1];
+                    // additionally, if the player leaving is the host,
+                    // assign the host role to the player that takes their place
+                    if (host == msg.sender) {
+                        host = players[i];
+                    }
+                }
+                players.pop();
+                if (entryFee > 0) {
+                    if (token == address(0)) {
+                        (bool refundSentSuccessfully, ) = payable(msg.sender)
+                            .call{value: entryFee}("");
+                        if (!refundSentSuccessfully) {
+                            revert RefundTransferError();
+                        }
+                    } else {
+                        try
+                            IERC20(token).transfer(msg.sender, entryFee)
+                        returns (bool success) {
+                            if (!success) revert ERC20TransferError(msg.sender);
+                        } catch {
+                            revert ERC20TransferError(msg.sender);
+                        }
+                    }
+                }
+                emit PlayerLeft(msg.sender);
+                if (players.length == 0) {
+                    host = address(0);
+                    startable = false;
+                    gameEnded = true;
+                    emit GameClosed();
+                }
+                return;
+            }
+        }
+        revert NotInGame();
+    }
+
+    function startGame() external notAfterGameStart onlyHost {
+        startable = false;
+        emit GameStarted();
     }
 }

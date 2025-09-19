@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "description": "onchain implementation of farkle",
     "author": "heyztb.eth",
-    "license": "AGPL-3.0-only",
+    "license": "MIT",
     "homepage": "https://github.com/heyztb/dod",
     "packageManager": "bun@1.2.4",
     "workspaces": [
@@ -33,7 +33,7 @@
         "turbo"
     ],
     "devDependencies": {
-        "@cloudflare/workers-types": "^4.20250917.0",
+        "@cloudflare/workers-types": "^4.20250918.0",
         "@eslint/css": "^0.11.0",
         "@eslint/js": "^9.35.0",
         "@eslint/json": "^0.13.2",
@@ -45,12 +45,12 @@
         "jiti": "^2.5.1",
         "turbo": "^2.5.6",
         "typescript-eslint": "^8.44.0",
-        "wrangler": "^4.37.1"
+        "wrangler": "^4.38.0"
     },
     "peerDependencies": {
         "typescript": "^5.8.3"
     },
     "dependencies": {
-        "hono": "^4.9.7"
+        "hono": "^4.9.8"
     }
 }

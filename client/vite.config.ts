@@ -26,5 +26,6 @@ export default defineConfig({
                 changeOrigin: true,
             },
         },
+        allowedHosts: ["dod.ztb.dev", "localhost"]
     },
 });

@@ -64,10 +64,12 @@ contract FarkleLeaderboard is
                 if (_stats.currentWinStreak > _stats.longestWinStreak) {
                     _stats.longestWinStreak = _stats.currentWinStreak;
                 }
-                if (token == address(0)) {
-                    _stats.ethWon = _stats.ethWon + pot;
-                } else {
-                    _stats.erc20Won[token] = _stats.erc20Won[token] + pot;
+                if (pot > 0) {
+                    if (token == address(0)) {
+                        _stats.ethWon = _stats.ethWon + pot;
+                    } else {
+                        _stats.erc20Won[token] = _stats.erc20Won[token] + pot;
+                    }
                 }
             } else {
                 _stats.currentWinStreak = 0;

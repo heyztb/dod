@@ -13,17 +13,14 @@ contract DeployFarkleGameBeacon is Script {
         address indexed newOwner
     );
 
-    function run(address vrfCoordinator, address treasury) external {
+    function run(address vrfCoordinator) external {
         vm.startBroadcast();
         address deployer = msg.sender;
 
         console.log("Deploying with account:", deployer);
 
         // First deploy the implementation contract
-        FarkleGameImpl implementation = new FarkleGameImpl(
-            vrfCoordinator,
-            treasury
-        );
+        FarkleGameImpl implementation = new FarkleGameImpl(vrfCoordinator);
         console.log("FarkleGameImpl deployed at:", address(implementation));
 
         // Deploy the beacon with the implementation
