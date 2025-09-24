@@ -8,11 +8,17 @@
     "dev": "bun --watch run src/index.ts && tsc --watch"
   },
   "dependencies": {
+    "@farcaster/miniapp-node": "^0.1.9",
     "@farcaster/quick-auth": "^0.0.8",
+    "@libsql/client": "^0.15.15",
+    "dotenv": "^17.2.2",
+    "drizzle-orm": "^0.44.5",
     "hono": "^4.7.11",
     "shared": "workspace:*"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "^1.2.22",
+    "drizzle-kit": "^0.31.4",
+    "tsx": "^4.20.5"
   }
 }

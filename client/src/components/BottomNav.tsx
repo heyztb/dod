@@ -28,7 +28,7 @@ export default function BottomNav() {
       className="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur border-t border-gray-300"
     >
       <div className="max-w-xl mx-auto px-0">
-        <ul className="grid grid-cols-3 gap-0 h-20">
+        <ul className="grid grid-cols-3 gap-0 h-16">
           <li className="h-full border-r border-gray-300">
             <Link
               {...homeLinkOpts}

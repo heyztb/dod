@@ -1,0 +1,17 @@
+{
+  "name": "safe",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@safe-global/api-kit": "^4.0.0",
+    "@safe-global/protocol-kit": "^6.1.1",
+    "@safe-global/types-kit": "^3.0.0"
+  }
+}
