@@ -6,7 +6,6 @@ pragma solidity ^0.8.30;
 import {Initializable} from "solady/utils/Initializable.sol";
 import {IFarkleGame} from "src/interface/IFarkleGame.sol";
 import {IFarkleLeaderboard, PlayerResult} from "src/interface/IFarkleLeaderboard.sol";
-import {IFarkleTreasury} from "src/interface/IFarkleTreasury.sol";
 import {VRFConsumerBaseV2Plus} from "chainlink/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "chainlink/vrf/dev/libraries/VRFV2PlusClient.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
@@ -16,8 +15,8 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
     // TODO: Update these addresses before deployment
     IFarkleLeaderboard public constant leaderboard =
         IFarkleLeaderboard(address(0x0000000000000000));
-    IFarkleTreasury public constant treasury =
-        IFarkleTreasury(address(0x0000000000000000));
+    address public constant treasury =
+        address(0x3cF189902B4902745CE27dDc864E4a2fe7641a0c);
     bool public startable = true;
     address public host;
     address[] public players;
@@ -25,7 +24,7 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
     address public token;
     uint256 public entryFee;
     mapping(address => uint256) public playerScores;
-    uint256 public constant MAX_SCORE = 10_000;
+    uint256 public constant MAX_SCORE = 1_000;
     address public finalTurnPlayer;
     address public winner;
     bool public finalTurn = false;
@@ -323,7 +322,7 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
 
         // Check for special combinations first (highest priority)
 
-        // Check for straight (1,2,3,4,5,6) = 1500 points
+        // Check for straight (1,2,3,4,5,6) = 150 points
         if (
             counts[1] == 1 &&
             counts[2] == 1 &&
@@ -332,10 +331,10 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
             counts[5] == 1 &&
             counts[6] == 1
         ) {
-            return 1500;
+            return 150;
         }
 
-        // Check for two sets of three of a kind = 2500 points
+        // Check for two sets of three of a kind = 250 points
         uint8 threeOfAKindCount = 0;
         for (uint8 value = 1; value <= 6; value++) {
             if (counts[value] == 3) {
@@ -343,10 +342,10 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
             }
         }
         if (threeOfAKindCount == 2) {
-            return 2500;
+            return 250;
         }
 
-        // Check for three pairs = 1500 points
+        // Check for three pairs = 150 points
         uint8 pairCount = 0;
         for (uint8 value = 1; value <= 6; value++) {
             if (counts[value] == 2) {
@@ -354,10 +353,10 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
             }
         }
         if (pairCount == 3) {
-            return 1500;
+            return 150;
         }
 
-        // Check for four of a kind + pair = 1500 points
+        // Check for four of a kind + pair = 150 points
         bool hasFourOfAKind = false;
         bool hasPair = false;
         for (uint8 value = 1; value <= 6; value++) {
@@ -368,7 +367,7 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
             }
         }
         if (hasFourOfAKind && hasPair) {
-            return 1500;
+            return 150;
         }
 
         // Standard scoring for individual combinations
@@ -377,27 +376,27 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
             if (count == 0) continue;
 
             if (count == 6) {
-                // 6 of a kind = 3000 points
-                score += 3000;
+                // 6 of a kind = 300 points
+                score += 300;
             } else if (count == 5) {
-                // 5 of a kind = 2000 points
-                score += 2000;
+                // 5 of a kind = 200 points
+                score += 200;
             } else if (count == 4) {
-                // 4 of a kind = 1000 points
-                score += 1000;
+                // 4 of a kind = 100 points
+                score += 100;
             } else if (count == 3) {
                 // Three of a kind
                 if (value == 1) {
-                    score += 1000; // Three 1s = 1000
+                    score += 100; // Three 1s = 100
                 } else {
-                    score += uint256(value) * 100; // Three of anything else = face value × 100
+                    score += uint256(value) * 10; // Three of anything else = face value × 10
                 }
             } else {
                 // Individual dice (1s and 5s only)
                 if (value == 1) {
-                    score += uint256(count) * 100; // Individual 1s = 100 each
+                    score += uint256(count) * 10; // Individual 1s = 100 each
                 } else if (value == 5) {
-                    score += uint256(count) * 50; // Individual 5s = 50 each
+                    score += uint256(count) * 5; // Individual 5s = 50 each
                 }
                 // Note: Individual 2s, 3s, 4s, 6s don't score unless part of combinations
             }
@@ -481,7 +480,7 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
                 pot = address(this).balance;
                 uint256 feeAmount = (pot * feeBasisPoints) / FEE_DENOMINATOR;
                 winnings = pot - feeAmount;
-                (bool feeSentSuccessfully, ) = payable(address(treasury)).call{
+                (bool feeSentSuccessfully, ) = payable(treasury).call{
                     value: feeAmount
                 }("");
                 if (!feeSentSuccessfully) {
