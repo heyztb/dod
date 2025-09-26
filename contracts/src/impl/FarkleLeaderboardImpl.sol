@@ -8,6 +8,9 @@ import {Initializable} from "solady/utils/Initializable.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {IFarkleGameFactory} from "src/interface/IFarkleGameFactory.sol";
+import {SupportedTokens} from "src/library/Token.sol";
+
+using SupportedTokens for SupportedTokens.Token;
 
 contract FarkleLeaderboard is
     IFarkleLeaderboard,
@@ -38,41 +41,43 @@ contract FarkleLeaderboard is
 
     function update(
         PlayerResult[] calldata results,
-        address token,
+        SupportedTokens.Token token,
         uint256 pot
     ) external onlyGame {
         for (uint256 i = 0; i < results.length; i++) {
             address player = results[i].player;
-            Stats storage _stats = leaderboard[player];
-            _stats.gamesPlayed = _stats.gamesPlayed + 1;
-            _stats.hotDiceRolled =
-                _stats.hotDiceRolled +
-                results[i].hotDiceCount;
-            _stats.farklesRolled =
-                _stats.farklesRolled +
-                results[i].farkleCount;
-            if (token == address(0)) {
-                _stats.ethWagered = _stats.ethWagered + results[i].wager;
-            } else {
-                _stats.erc20Wagered[token] =
-                    _stats.erc20Wagered[token] +
-                    results[i].wager;
-            }
+            Stats storage stats = leaderboard[player];
+            stats.gamesPlayed += 1;
+            stats.hotDiceRolled += results[i].hotDiceCount;
+            stats.farklesRolled += results[i].farkleCount;
             if (results[i].winner) {
-                _stats.gamesWon = _stats.gamesWon + 1;
-                _stats.currentWinStreak = _stats.currentWinStreak + 1;
-                if (_stats.currentWinStreak > _stats.longestWinStreak) {
-                    _stats.longestWinStreak = _stats.currentWinStreak;
+                stats.gamesWon += 1;
+                stats.currentWinStreak += 1;
+
+                if (stats.currentWinStreak > stats.longestWinStreak) {
+                    stats.longestWinStreak = stats.currentWinStreak;
                 }
+
                 if (pot > 0) {
-                    if (token == address(0)) {
-                        _stats.ethWon = _stats.ethWon + pot;
-                    } else {
-                        _stats.erc20Won[token] = _stats.erc20Won[token] + pot;
+                    if (token.isETH()) {
+                        stats.ethWagered += results[i].wager;
+                        stats.ethWon += results[i].amountWon;
+                    } else if (token.isUSDC()) {
+                        stats.usdcWagered =
+                            stats.usdcWagered +
+                            results[i].wager;
+                        stats.usdcWon += results[i].amountWon;
                     }
                 }
             } else {
-                _stats.currentWinStreak = 0;
+                stats.currentWinStreak = 0;
+                if (pot > 0) {
+                    if (token.isETH()) {
+                        stats.ethWagered += results[i].wager;
+                    } else if (token.isUSDC()) {
+                        stats.usdcWagered += results[i].wager;
+                    }
+                }
             }
         }
         emit LeaderboardUpdated(token, results);

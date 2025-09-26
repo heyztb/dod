@@ -6,33 +6,43 @@ pragma solidity ^0.8.30;
 import {Initializable} from "solady/utils/Initializable.sol";
 import {IFarkleGame} from "src/interface/IFarkleGame.sol";
 import {IFarkleLeaderboard, PlayerResult} from "src/interface/IFarkleLeaderboard.sol";
+import {SupportedTokens} from "src/library/Token.sol";
 import {VRFConsumerBaseV2Plus} from "chainlink/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "chainlink/vrf/dev/libraries/VRFV2PlusClient.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 
+using SupportedTokens for SupportedTokens.Token;
+
 contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
     string public constant VERSION = "v1";
-    // TODO: Update these addresses before deployment
+    uint256 public constant MAX_SCORE = 1_000;
     IFarkleLeaderboard public constant leaderboard =
-        IFarkleLeaderboard(address(0x0000000000000000));
+        IFarkleLeaderboard(address(0));
     address public constant treasury =
         address(0x3cF189902B4902745CE27dDc864E4a2fe7641a0c);
-    bool public startable = true;
+    address public constant usdc =
+        address(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
+    SupportedTokens.Token public token;
+    uint256 public entryFee;
+    uint256 public pot;
+
     address public host;
     address[] public players;
     uint256 public currentPlayer;
-    address public token;
-    uint256 public entryFee;
-    mapping(address => uint256) public playerScores;
-    uint256 public constant MAX_SCORE = 1_000;
     address public finalTurnPlayer;
     address public winner;
+
+    bool public startable = true;
     bool public finalTurn = false;
     bool public gameEnded = false;
+
+    mapping(address => uint256) public playerScores;
     mapping(address => uint256) public farkleCounts;
     mapping(address => uint256) public hotDiceCounts;
+
     uint256 public constant feeBasisPoints = 250;
     uint256 public constant FEE_DENOMINATOR = 10000;
+
     uint256 s_subscriptionId =
         110332509415864652465086222220959657000163978298414210005002692430465200668803;
     bytes32 s_keyHash =
@@ -43,11 +53,11 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
     mapping(address => bool) public s_rollInProgress;
 
     struct DiceState {
-        uint48 values; // Current dice values (1-6 each)
-        uint8 selectedMask; // Bit mask for selected dice (1 = selected, 0 = available)
-        uint8 availableCount; // Number of dice available to roll
-        uint32 turnScore; // Points accumulated this turn
-        bool hasRolled; // Whether player has rolled this turn
+        uint48 values;
+        uint8 selectedMask;
+        uint8 availableCount;
+        uint32 turnScore;
+        bool hasRolled;
     }
 
     DiceState public dice;
@@ -66,7 +76,11 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
     event Banked(address indexed player, uint256 turnScore, uint256 totalScore);
     event Farkled(address indexed player);
     event FinalTurn();
-    event PlayerWon(address indexed player, address token, uint256 amount);
+    event PlayerWon(
+        address indexed player,
+        SupportedTokens.Token token,
+        uint256 amount
+    );
     event GameOver(address indexed winner, uint256 score);
 
     error AlreadyJoined();
@@ -89,9 +103,9 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
     error SelectionMustScorePoints();
     error MustRollAtLeastOnce();
     error NotEnoughEther();
-    error WantERC20NotETH();
-    error ERC20TransferFromError(address player);
-    error ERC20TransferError(address player);
+    error WantUSDCNotETH();
+    error USDCTransferFromError(address player);
+    error USDCTransferError(address player);
     error FeeTransferError();
     error RefundTransferError();
     error WinnerTransferError();
@@ -129,7 +143,7 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
     }
 
     function initialize(
-        address _token,
+        SupportedTokens.Token _token,
         uint256 _entryFee
     ) external initializer {
         token = _token;
@@ -142,6 +156,84 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
             hasRolled: false
         });
         transferOwnership(address(0));
+    }
+
+    function join() external payable notAfterGameStart {
+        if (players.length == 4) {
+            revert GameFull();
+        }
+
+        if (entryFee > 0) {
+            if (token.isETH()) {
+                if (msg.value < entryFee) revert NotEnoughEther();
+            } else if (token.isUSDC()) {
+                if (msg.value != 0) revert WantUSDCNotETH();
+                bool transferFromSuccess = IERC20(usdc).transferFrom(
+                    msg.sender,
+                    address(this),
+                    entryFee
+                );
+                if (!transferFromSuccess) {
+                    revert USDCTransferFromError(msg.sender);
+                }
+            }
+            pot += entryFee;
+        }
+
+        for (uint256 i = 0; i < players.length; i++) {
+            if (players[i] == msg.sender) {
+                revert AlreadyJoined();
+            }
+        }
+        players.push(msg.sender);
+        if (players.length == 1) {
+            host = msg.sender;
+        }
+        emit PlayerJoined(msg.sender);
+    }
+
+    function leave() external notAfterGameStart {
+        for (uint256 i = 0; i < players.length; i++) {
+            if (players[i] == msg.sender) {
+                if (i < players.length - 1) {
+                    players[i] = players[players.length - 1];
+                    if (host == msg.sender) {
+                        host = players[i];
+                    }
+                }
+                players.pop();
+                if (entryFee > 0) {
+                    if (token.isETH()) {
+                        (bool refundSentSuccessfully, ) = payable(msg.sender)
+                            .call{value: entryFee}("");
+                        if (!refundSentSuccessfully) {
+                            revert RefundTransferError();
+                        }
+                    } else if (token.isUSDC()) {
+                        bool transferSuccess = IERC20(usdc).transfer(
+                            msg.sender,
+                            entryFee
+                        );
+                        if (!transferSuccess)
+                            revert USDCTransferError(msg.sender);
+                    }
+                }
+                emit PlayerLeft(msg.sender);
+                if (players.length == 0) {
+                    host = address(0);
+                    startable = false;
+                    gameEnded = true;
+                    emit GameClosed();
+                }
+                return;
+            }
+        }
+        revert NotInGame();
+    }
+
+    function startGame() external notAfterGameStart onlyHost {
+        startable = false;
+        emit GameStarted();
     }
 
     function roll()
@@ -461,6 +553,13 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
             }
         }
 
+        uint256 fee;
+        uint256 winnings;
+        if (entryFee > 0) {
+            fee = (pot * feeBasisPoints) / FEE_DENOMINATOR;
+            winnings = pot - fee;
+        }
+
         PlayerResult[] memory results = new PlayerResult[](players.length);
         for (uint256 i = 0; i < players.length; i++) {
             address player = players[i];
@@ -469,63 +568,40 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
                 winner: (player == winner),
                 farkleCount: farkleCounts[player],
                 hotDiceCount: hotDiceCounts[player],
-                wager: entryFee
+                wager: entryFee,
+                amountWon: (player == winner ? winnings : 0)
             });
         }
 
-        uint256 pot;
-        uint256 winnings;
         if (entryFee > 0) {
-            if (token == address(0)) {
-                pot = address(this).balance;
-                uint256 feeAmount = (pot * feeBasisPoints) / FEE_DENOMINATOR;
-                winnings = pot - feeAmount;
-                (bool feeSentSuccessfully, ) = payable(treasury).call{
-                    value: feeAmount
-                }("");
-                if (!feeSentSuccessfully) {
+            bool feeCollected;
+            bool sentWinnings;
+            if (token.isETH()) {
+                (feeCollected, ) = payable(treasury).call{value: fee}("");
+                if (!feeCollected) {
                     revert FeeTransferError();
                 }
 
-                (bool winningsSentSuccesfully, ) = payable(winner).call{
-                    value: winnings
-                }("");
-                if (!winningsSentSuccesfully) {
-                    revert WinnerTransferError();
-                }
-            } else {
-                try IERC20(token).balanceOf(address(this)) returns (
-                    uint256 _pot
-                ) {
-                    pot = _pot;
-                } catch {
-                    revert InvalidToken();
-                }
-                uint256 feeAmount = (pot * feeBasisPoints) / FEE_DENOMINATOR;
-                winnings = pot - feeAmount;
-                try
-                    IERC20(token).transfer(address(treasury), feeAmount)
-                returns (bool feeSentSuccessfully) {
-                    if (!feeSentSuccessfully) revert FeeTransferError();
-                } catch {
-                    revert FeeTransferError();
-                }
-
-                try IERC20(token).transfer(winner, winnings) returns (
-                    bool winningsSentSuccesfully
-                ) {
-                    if (!winningsSentSuccesfully) revert WinnerTransferError();
-                } catch {
+                (sentWinnings, ) = payable(winner).call{value: winnings}("");
+                if (!sentWinnings) {
                     revert WinnerTransferError();
                 }
             }
 
-            leaderboard.update(results, token, pot);
-            emit PlayerWon(winner, token, winnings);
-        } else {
-            leaderboard.update(results, address(0), 0);
-            emit PlayerWon(winner, address(0), 0);
+            if (token.isUSDC()) {
+                feeCollected = IERC20(usdc).transfer(treasury, fee);
+                if (!feeCollected) {
+                    revert USDCTransferError(treasury);
+                }
+
+                sentWinnings = IERC20(usdc).transfer(winner, winnings);
+                if (!sentWinnings) {
+                    revert USDCTransferError(winner);
+                }
+            }
         }
+
+        leaderboard.update(results, token, pot);
         emit GameOver(winner, highestScore);
     }
 
@@ -564,90 +640,5 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
 
     function getAvailableCount() external view returns (uint8) {
         return dice.availableCount;
-    }
-
-    function join() external payable notAfterGameStart {
-        if (players.length == 4) {
-            revert GameFull();
-        }
-
-        if (entryFee > 0) {
-            if (token == address(0)) {
-                if (msg.value != entryFee) revert NotEnoughEther();
-            } else {
-                if (msg.value != 0) revert WantERC20NotETH();
-                try
-                    IERC20(token).transferFrom(
-                        msg.sender,
-                        address(this),
-                        entryFee
-                    )
-                returns (bool success) {
-                    if (!success) revert ERC20TransferFromError(msg.sender);
-                } catch {
-                    revert ERC20TransferFromError(msg.sender);
-                }
-            }
-        }
-
-        for (uint256 i = 0; i < players.length; i++) {
-            if (players[i] == msg.sender) {
-                revert AlreadyJoined();
-            }
-        }
-        players.push(msg.sender);
-        if (players.length == 1) {
-            host = msg.sender;
-        }
-        emit PlayerJoined(msg.sender);
-    }
-
-    function leave() external notAfterGameStart {
-        for (uint256 i = 0; i < players.length; i++) {
-            if (players[i] == msg.sender) {
-                // if this is not the last player
-                if (i < players.length - 1) {
-                    // swap them with the last player
-                    players[i] = players[players.length - 1];
-                    // additionally, if the player leaving is the host,
-                    // assign the host role to the player that takes their place
-                    if (host == msg.sender) {
-                        host = players[i];
-                    }
-                }
-                players.pop();
-                if (entryFee > 0) {
-                    if (token == address(0)) {
-                        (bool refundSentSuccessfully, ) = payable(msg.sender)
-                            .call{value: entryFee}("");
-                        if (!refundSentSuccessfully) {
-                            revert RefundTransferError();
-                        }
-                    } else {
-                        try
-                            IERC20(token).transfer(msg.sender, entryFee)
-                        returns (bool success) {
-                            if (!success) revert ERC20TransferError(msg.sender);
-                        } catch {
-                            revert ERC20TransferError(msg.sender);
-                        }
-                    }
-                }
-                emit PlayerLeft(msg.sender);
-                if (players.length == 0) {
-                    host = address(0);
-                    startable = false;
-                    gameEnded = true;
-                    emit GameClosed();
-                }
-                return;
-            }
-        }
-        revert NotInGame();
-    }
-
-    function startGame() external notAfterGameStart onlyHost {
-        startable = false;
-        emit GameStarted();
     }
 }

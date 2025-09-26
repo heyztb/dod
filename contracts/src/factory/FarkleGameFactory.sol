@@ -7,15 +7,19 @@ import {Ownable} from "solady/auth/Ownable.sol";
 import {LibClone} from "solady/utils/LibClone.sol";
 import {IFarkleGameFactory} from "src/interface/IFarkleGameFactory.sol";
 import {IFarkleGame} from "src/interface/IFarkleGame.sol";
+import {SupportedTokens} from "src/library/Token.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 
+using SupportedTokens for SupportedTokens.Token;
+
 contract FarkleGameFactory is IFarkleGameFactory, Ownable {
+    address public constant usdc =
+        address(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
     address public immutable gameBeacon;
     mapping(address => bool) public games;
 
     event GameCreated(address indexed game);
 
-    error InvalidERC20TokenAddress();
     error InvalidPlayers();
 
     constructor(address _gameBeacon) {
@@ -24,18 +28,9 @@ contract FarkleGameFactory is IFarkleGameFactory, Ownable {
     }
 
     function createGame(
-        address token,
+        SupportedTokens.Token token,
         uint256 entryFee
     ) external returns (address) {
-        if (token != address(0)) {
-            if (token.code.length == 0) revert InvalidERC20TokenAddress();
-            try IERC20(token).totalSupply() returns (uint256) {
-                // do nothing, just checking that the token address at least looks like an ERC20
-            } catch {
-                revert InvalidERC20TokenAddress();
-            }
-        }
-
         address game = LibClone.deployERC1967BeaconProxy(
             gameBeacon,
             abi.encodeCall(IFarkleGame.initialize, (token, entryFee))

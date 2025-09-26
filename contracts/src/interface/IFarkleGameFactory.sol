@@ -3,9 +3,11 @@
 /// @author heyztb.eth
 pragma solidity ^0.8.30;
 
+import {SupportedTokens} from "src/library/Token.sol";
+
 interface IFarkleGameFactory {
     function createGame(
-        address token,
+        SupportedTokens.Token token,
         uint256 entryFee
     ) external returns (address);
 

@@ -3,21 +3,22 @@
 /// @author heyztb.eth
 pragma solidity ^0.8.30;
 
+import {SupportedTokens} from "src/library/Token.sol";
+
 interface IFarkleGame {
-	function initialize(
-		address token,
-		uint256 _entryFee
-	) external;
+    function initialize(SupportedTokens.Token token, uint256 entryFee) external;
 
-	function join() external payable;
+    function join() external payable;
 
-	function leave() external;
+    function leave() external;
 
-	function startGame() external;
+    function startGame() external;
 
-	function roll() external;
+    function roll() external;
 
-	function selectDice(uint8[] calldata selectedIndices) external returns (uint256);
+    function selectDice(
+        uint8[] calldata selectedIndices
+    ) external returns (uint256);
 
-	function bank() external;
+    function bank() external;
 }
