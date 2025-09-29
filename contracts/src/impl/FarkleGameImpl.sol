@@ -185,15 +185,15 @@ contract FarkleGameImpl is
         whenNotPaused
     {
         if (!refundElligble[msg.sender]) revert InvalidVoteRequest();
-        votesToPauseUnpause++;
         uint256 threshold = 2;
         if (players.length == 4) {
             threshold = 3;
         }
+        votesToPauseUnpause++;
         if (votesToPauseUnpause >= threshold) {
             _pause();
+            votesToPauseUnpause = 0;
         }
-        votesToPauseUnpause = 0;
     }
 
     function voteToUnpause()
@@ -203,15 +203,15 @@ contract FarkleGameImpl is
         whenPaused
     {
         if (!refundElligble[msg.sender]) revert InvalidVoteRequest();
-        votesToPauseUnpause++;
         uint256 threshold = 2;
         if (players.length == 4) {
             threshold = 3;
         }
+        votesToPauseUnpause++;
         if (votesToPauseUnpause >= threshold) {
             _unpause();
+            votesToPauseUnpause = 0;
         }
-        votesToPauseUnpause = 0;
     }
 
     function withdraw() external whenPaused nonReentrant {
