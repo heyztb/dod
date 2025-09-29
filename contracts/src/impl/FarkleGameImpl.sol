@@ -10,18 +10,26 @@ import {SupportedTokens} from "src/library/Token.sol";
 import {VRFConsumerBaseV2Plus} from "chainlink/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "chainlink/vrf/dev/libraries/VRFV2PlusClient.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
+import {Pausable} from "openzeppelin/utils/Pausable.sol";
+import {ReentrancyGuard} from "openzeppelin/utils/ReentrancyGuard.sol";
 
 using SupportedTokens for SupportedTokens.Token;
 
-contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
+contract FarkleGameImpl is
+    IFarkleGame,
+    Initializable,
+    VRFConsumerBaseV2Plus,
+    Pausable,
+    ReentrancyGuard
+{
     string public constant VERSION = "v1";
     uint256 public constant MAX_SCORE = 1_000;
-    IFarkleLeaderboard public constant leaderboard =
+    IFarkleLeaderboard public constant LEADERBOARD =
         IFarkleLeaderboard(address(0));
-    address public constant treasury =
-        address(0x3cF189902B4902745CE27dDc864E4a2fe7641a0c);
-    address public constant usdc =
-        address(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
+    address public constant TREASURY =
+        0x3cF189902B4902745CE27dDc864E4a2fe7641a0c;
+    address public constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+    address public constant SAFE = 0x6052F75B3FbDd4A89d6a0E4Be7119Db18ea20a35;
     SupportedTokens.Token public token;
     uint256 public entryFee;
     uint256 public pot;
@@ -35,10 +43,12 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
     bool public startable = true;
     bool public finalTurn = false;
     bool public gameEnded = false;
+    uint256 public votesToPauseUnpause;
 
     mapping(address => uint256) public playerScores;
     mapping(address => uint256) public farkleCounts;
     mapping(address => uint256) public hotDiceCounts;
+    mapping(address => bool) internal refundElligble;
 
     uint256 public constant feeBasisPoints = 250;
     uint256 public constant FEE_DENOMINATOR = 10000;
@@ -109,6 +119,8 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
     error FeeTransferError();
     error RefundTransferError();
     error WinnerTransferError();
+    error InvalidRefundRequest();
+    error InvalidVoteRequest();
 
     modifier onlyCurrentPlayer() {
         if (msg.sender != players[currentPlayer]) revert NotCurrentPlayer();
@@ -155,29 +167,87 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
             turnScore: 0,
             hasRolled: false
         });
-        transferOwnership(address(0));
+        transferOwnership(SAFE);
     }
 
-    function join() external payable notAfterGameStart {
-        if (players.length == 4) {
-            revert GameFull();
-        }
+    function pause() external onlyOwner {
+        _pause();
+    }
 
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    function voteToPause()
+        external
+        notBeforeGameStart
+        notAfterGameOver
+        whenNotPaused
+    {
+        if (!refundElligble[msg.sender]) revert InvalidVoteRequest();
+        votesToPauseUnpause++;
+        uint256 threshold = 2;
+        if (players.length == 4) {
+            threshold = 3;
+        }
+        if (votesToPauseUnpause >= threshold) {
+            _pause();
+        }
+        votesToPauseUnpause = 0;
+    }
+
+    function voteToUnpause()
+        external
+        notBeforeGameStart
+        notAfterGameOver
+        whenPaused
+    {
+        if (!refundElligble[msg.sender]) revert InvalidVoteRequest();
+        votesToPauseUnpause++;
+        uint256 threshold = 2;
+        if (players.length == 4) {
+            threshold = 3;
+        }
+        if (votesToPauseUnpause >= threshold) {
+            _unpause();
+        }
+        votesToPauseUnpause = 0;
+    }
+
+    function withdraw() external whenPaused nonReentrant {
         if (entryFee > 0) {
+            if (!refundElligble[msg.sender]) {
+                revert InvalidRefundRequest();
+            }
+            refundElligble[msg.sender] = false;
+
             if (token.isETH()) {
-                if (msg.value < entryFee) revert NotEnoughEther();
-            } else if (token.isUSDC()) {
-                if (msg.value != 0) revert WantUSDCNotETH();
-                bool transferFromSuccess = IERC20(usdc).transferFrom(
-                    msg.sender,
-                    address(this),
-                    entryFee
-                );
-                if (!transferFromSuccess) {
-                    revert USDCTransferFromError(msg.sender);
+                (bool refund, ) = payable(msg.sender).call{value: entryFee}("");
+                if (!refund) {
+                    revert RefundTransferError();
                 }
             }
-            pot += entryFee;
+
+            if (token.isUSDC()) {
+                bool refund = IERC20(USDC).transfer(msg.sender, entryFee);
+                if (!refund) {
+                    revert RefundTransferError();
+                }
+            }
+        } else {
+            revert InvalidRefundRequest();
+        }
+    }
+
+    function join()
+        external
+        payable
+        notAfterGameStart
+        whenNotPaused
+        nonReentrant
+    {
+        if (players.length == 4) {
+            revert GameFull();
         }
 
         for (uint256 i = 0; i < players.length; i++) {
@@ -189,10 +259,30 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
         if (players.length == 1) {
             host = msg.sender;
         }
+
+        if (entryFee > 0) {
+            if (token.isETH()) {
+                if (msg.value < entryFee) revert NotEnoughEther();
+            } else if (token.isUSDC()) {
+                if (msg.value != 0) revert WantUSDCNotETH();
+                bool transferFromSuccess = IERC20(USDC).transferFrom(
+                    msg.sender,
+                    address(this),
+                    entryFee
+                );
+                if (!transferFromSuccess) {
+                    revert USDCTransferFromError(msg.sender);
+                }
+            }
+            pot += entryFee;
+        }
+
+        refundElligble[msg.sender] = true;
         emit PlayerJoined(msg.sender);
     }
 
-    function leave() external notAfterGameStart {
+    function leave() external notAfterGameStart whenNotPaused nonReentrant {
+        refundElligble[msg.sender] = false;
         for (uint256 i = 0; i < players.length; i++) {
             if (players[i] == msg.sender) {
                 if (i < players.length - 1) {
@@ -210,7 +300,7 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
                             revert RefundTransferError();
                         }
                     } else if (token.isUSDC()) {
-                        bool transferSuccess = IERC20(usdc).transfer(
+                        bool transferSuccess = IERC20(USDC).transfer(
                             msg.sender,
                             entryFee
                         );
@@ -231,7 +321,7 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
         revert NotInGame();
     }
 
-    function startGame() external notAfterGameStart onlyHost {
+    function startGame() external notAfterGameStart onlyHost whenNotPaused {
         startable = false;
         emit GameStarted();
     }
@@ -242,6 +332,7 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
         onlyCurrentPlayer
         notBeforeGameStart
         notAfterGameOver
+        whenNotPaused
     {
         if (dice.availableCount == 0) revert NoDiceAvailable();
 
@@ -298,6 +389,7 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
         onlyCurrentPlayer
         notBeforeGameStart
         notAfterGameOver
+        whenNotPaused
         returns (uint256)
     {
         if (!dice.hasRolled) revert MustRollFirst();
@@ -348,6 +440,8 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
         onlyCurrentPlayer
         notBeforeGameStart
         notAfterGameOver
+        whenNotPaused
+        nonReentrant
     {
         if (!dice.hasRolled) revert MustRollAtLeastOnce();
 
@@ -551,6 +645,7 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
                 highestScore = score;
                 winner = player;
             }
+            refundElligble[player] = false;
         }
 
         uint256 fee;
@@ -577,7 +672,7 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
             bool feeCollected;
             bool sentWinnings;
             if (token.isETH()) {
-                (feeCollected, ) = payable(treasury).call{value: fee}("");
+                (feeCollected, ) = payable(TREASURY).call{value: fee}("");
                 if (!feeCollected) {
                     revert FeeTransferError();
                 }
@@ -589,19 +684,19 @@ contract FarkleGameImpl is IFarkleGame, Initializable, VRFConsumerBaseV2Plus {
             }
 
             if (token.isUSDC()) {
-                feeCollected = IERC20(usdc).transfer(treasury, fee);
+                feeCollected = IERC20(USDC).transfer(TREASURY, fee);
                 if (!feeCollected) {
-                    revert USDCTransferError(treasury);
+                    revert USDCTransferError(TREASURY);
                 }
 
-                sentWinnings = IERC20(usdc).transfer(winner, winnings);
+                sentWinnings = IERC20(USDC).transfer(winner, winnings);
                 if (!sentWinnings) {
                     revert USDCTransferError(winner);
                 }
             }
         }
 
-        leaderboard.update(results, token, pot);
+        LEADERBOARD.update(results, token, pot);
         emit GameOver(winner, highestScore);
     }
 
