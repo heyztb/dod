@@ -6,9 +6,6 @@ import {console} from "forge-std/console.sol";
 
 import {LibClone} from "solady/utils/LibClone.sol";
 
-import {IFarkleTreasury} from "src/interface/IFarkleTreasury.sol";
-import {FarkleTreasuryImpl} from "src/impl/FarkleTreasuryImpl.sol";
-
 import {FarkleGameImpl} from "src/impl/FarkleGameImpl.sol";
 
 import {FarkleGameFactory} from "../src/factory/FarkleGameFactory.sol";
@@ -19,15 +16,6 @@ contract DeployAll is Script {
         require(vrfCoordinator != address(0), "vrfCoordinator required");
 
         vm.startBroadcast();
-
-        // 1) Deploy Treasury impl and proxy
-        FarkleTreasuryImpl treasuryImpl = new FarkleTreasuryImpl();
-        console.log("Deployed Treasury Impl at:", address(treasuryImpl));
-        address treasury = LibClone.deployERC1967(
-            address(treasuryImpl),
-            abi.encodeCall(IFarkleTreasury.initialize, ())
-        );
-        console.log("FarkleTreasury proxy at:", treasury);
 
         // 3) Deploy FarkleGame implementation + beacon
         FarkleGameImpl gameImpl = new FarkleGameImpl(vrfCoordinator);
