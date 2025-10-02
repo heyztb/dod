@@ -116,6 +116,7 @@ contract FarkleGameImpl is
     error MustSelectAtLeastOneDie();
     error SelectionMustScorePoints();
     error NoEntryFee();
+    error AlreadyPaidEntryFee();
     error NotEnoughEther();
     error WantUSDCNotETH();
     error USDCTransferFromError(address player);
@@ -235,6 +236,7 @@ contract FarkleGameImpl is
         onlyAfterJoin
         notAfterGameStart
     {
+        if (refundElligble[msg.sender]) revert AlreadyPaidEntryFee();
         pot += entryFee;
         refundElligble[msg.sender] = true;
         if (token.isETH()) {
@@ -422,10 +424,10 @@ contract FarkleGameImpl is
 
     function bank()
         external
+        nonReentrant
         onlyCurrentPlayer
         notBeforeGameStart
         notAfterGameOver
-        nonReentrant
     {
         if (!dice.hasRolled) revert MustRollAtLeastOnce();
 
@@ -564,9 +566,9 @@ contract FarkleGameImpl is
             } else {
                 // Individual dice (1s and 5s only)
                 if (value == 1) {
-                    score += uint256(count) * 10; // Individual 1s = 100 each
+                    score += uint256(count) * 10; // Individual 1s = 10 each
                 } else if (value == 5) {
-                    score += uint256(count) * 5; // Individual 5s = 50 each
+                    score += uint256(count) * 5; // Individual 5s = 5 each
                 }
                 // Note: Individual 2s, 3s, 4s, 6s don't score unless part of combinations
             }
@@ -618,7 +620,7 @@ contract FarkleGameImpl is
         }
     }
 
-    function _endGame() internal nonReentrant {
+    function _endGame() internal {
         uint256 highestScore = 0;
         for (uint256 i = 0; i < players.length; i++) {
             address player = players[i];
