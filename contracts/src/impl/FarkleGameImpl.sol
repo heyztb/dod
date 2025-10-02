@@ -302,7 +302,7 @@ contract FarkleGameImpl is
                 revert WinnerTransferError();
             }
         } else if (token.isUSDC()) {
-            IERC20(USDC).transfer(msg.sender, entryFee);
+            IERC20(USDC).transfer(msg.sender, winnings);
         }
     }
 
