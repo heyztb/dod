@@ -36,6 +36,7 @@ contract FarkleGameImpl is
 
     address public host;
     address[] public players;
+    mapping(address => bool) isPlayer;
     uint256 public currentPlayer;
     address public finalTurnPlayer;
     address public winner;
@@ -43,15 +44,14 @@ contract FarkleGameImpl is
     bool public startable = true;
     bool public finalTurn = false;
     bool public gameEnded = false;
-    uint256 public votesToPauseUnpause;
 
-    mapping(address => uint256) public playerScores;
-    mapping(address => uint256) public farkleCounts;
-    mapping(address => uint256) public hotDiceCounts;
-    mapping(address => bool) internal refundElligble;
+    mapping(address => uint256) playerScores;
+    mapping(address => uint256) farkleCounts;
+    mapping(address => uint256) hotDiceCounts;
+    mapping(address => bool) refundElligble;
 
-    uint256 public constant feeBasisPoints = 250;
-    uint256 public constant FEE_DENOMINATOR = 10000;
+    uint256 constant FEE_BASIS_POINTS = 250;
+    uint256 constant FEE_DENOMINATOR = 10000;
 
     uint256 s_subscriptionId =
         110332509415864652465086222220959657000163978298414210005002692430465200668803;
@@ -59,8 +59,8 @@ contract FarkleGameImpl is
         0x9e1344a1247c8a1785d0a4681a27152bffdb43666ae5bf7d14d24a5efd44bf71;
     uint32 s_callbackGasLimit = 150000;
     uint16 s_requestConfirmations = 1;
-    mapping(uint256 => address) public s_requestToPlayer;
-    mapping(address => bool) public s_rollInProgress;
+    mapping(uint256 => address) s_requestToPlayer;
+    mapping(address => bool) s_rollInProgress;
 
     struct DiceState {
         uint48 values;
@@ -93,25 +93,29 @@ contract FarkleGameImpl is
     );
     event GameOver(address indexed winner, uint256 score);
 
+    error MustJoinGame();
     error AlreadyJoined();
     error GameFull();
-    error NotInGame();
     error MustBeHost();
+    error NotEnoughPlayers();
     error GameNotStarted();
     error GameAlreadyStarted();
     error InvalidToken();
     error InvalidTreasury();
     error NotCurrentPlayer();
     error GameAlreadyOver();
-    error InvalidSelection();
+    error GameMustBeOver();
+    error MustBeWinner();
     error MustRollFirst();
+    error MustRollAtLeastOnce();
     error RollInProgress();
     error DiceAlreadySelected();
     error NoScoringDice();
     error NoDiceAvailable();
+    error InvalidSelection();
     error MustSelectAtLeastOneDie();
     error SelectionMustScorePoints();
-    error MustRollAtLeastOnce();
+    error NoEntryFee();
     error NotEnoughEther();
     error WantUSDCNotETH();
     error USDCTransferFromError(address player);
@@ -119,11 +123,23 @@ contract FarkleGameImpl is
     error FeeTransferError();
     error RefundTransferError();
     error WinnerTransferError();
+    error InvalidWithdrawalRequest();
     error InvalidRefundRequest();
     error InvalidVoteRequest();
+    error VRFRequestNotFound();
 
     modifier onlyCurrentPlayer() {
         if (msg.sender != players[currentPlayer]) revert NotCurrentPlayer();
+        _;
+    }
+
+    modifier notAfterJoin() {
+        if (isPlayer[msg.sender]) revert AlreadyJoined();
+        _;
+    }
+
+    modifier onlyAfterJoin() {
+        if (!isPlayer[msg.sender]) revert MustJoinGame();
         _;
     }
 
@@ -142,8 +158,28 @@ contract FarkleGameImpl is
         _;
     }
 
+    modifier onlyAfterGameOver() {
+        if (!gameEnded) revert GameMustBeOver();
+        _;
+    }
+
     modifier onlyHost() {
         if (msg.sender != host) revert MustBeHost();
+        _;
+    }
+
+    modifier onlyWinner() {
+        if (msg.sender != winner) revert MustBeWinner();
+        _;
+    }
+
+    modifier mustBeElligbleForRefund() {
+        if (!refundElligble[msg.sender]) revert InvalidRefundRequest();
+        _;
+    }
+
+    modifier gameMustHaveEntryFee() {
+        if (entryFee == 0) revert NoEntryFee();
         _;
     }
 
@@ -170,158 +206,108 @@ contract FarkleGameImpl is
         transferOwnership(SAFE);
     }
 
-    function pause() external onlyOwner {
+    function pause() external onlyOwner notBeforeGameStart {
         _pause();
     }
 
-    function unpause() external onlyOwner {
+    function unpause() external onlyOwner notBeforeGameStart {
         _unpause();
     }
 
-    function voteToPause()
-        external
-        notBeforeGameStart
-        notAfterGameOver
-        whenNotPaused
-    {
-        if (!refundElligble[msg.sender]) revert InvalidVoteRequest();
-        uint256 threshold = 2;
-        if (players.length == 4) {
-            threshold = 3;
-        }
-        votesToPauseUnpause++;
-        if (votesToPauseUnpause >= threshold) {
-            _pause();
-            votesToPauseUnpause = 0;
-        }
-    }
-
-    function voteToUnpause()
-        external
-        notBeforeGameStart
-        notAfterGameOver
-        whenPaused
-    {
-        if (!refundElligble[msg.sender]) revert InvalidVoteRequest();
-        uint256 threshold = 2;
-        if (players.length == 4) {
-            threshold = 3;
-        }
-        votesToPauseUnpause++;
-        if (votesToPauseUnpause >= threshold) {
-            _unpause();
-            votesToPauseUnpause = 0;
-        }
-    }
-
-    function withdraw() external whenPaused nonReentrant {
-        if (entryFee > 0) {
-            if (!refundElligble[msg.sender]) {
-                revert InvalidRefundRequest();
-            }
-            refundElligble[msg.sender] = false;
-
-            if (token.isETH()) {
-                (bool refund, ) = payable(msg.sender).call{value: entryFee}("");
-                if (!refund) {
-                    revert RefundTransferError();
-                }
-            }
-
-            if (token.isUSDC()) {
-                bool refund = IERC20(USDC).transfer(msg.sender, entryFee);
-                if (!refund) {
-                    revert RefundTransferError();
-                }
-            }
-        } else {
-            revert InvalidRefundRequest();
-        }
-    }
-
-    function join()
-        external
-        payable
-        notAfterGameStart
-        whenNotPaused
-        nonReentrant
-    {
+    function join() external notAfterJoin notAfterGameStart {
         if (players.length == 4) {
             revert GameFull();
         }
 
-        for (uint256 i = 0; i < players.length; i++) {
-            if (players[i] == msg.sender) {
-                revert AlreadyJoined();
-            }
-        }
+        isPlayer[msg.sender] = true;
         players.push(msg.sender);
         if (players.length == 1) {
             host = msg.sender;
         }
-
-        if (entryFee > 0) {
-            if (token.isETH()) {
-                if (msg.value < entryFee) revert NotEnoughEther();
-            } else if (token.isUSDC()) {
-                if (msg.value != 0) revert WantUSDCNotETH();
-                bool transferFromSuccess = IERC20(USDC).transferFrom(
-                    msg.sender,
-                    address(this),
-                    entryFee
-                );
-                if (!transferFromSuccess) {
-                    revert USDCTransferFromError(msg.sender);
-                }
-            }
-            pot += entryFee;
-        }
-
-        refundElligble[msg.sender] = true;
         emit PlayerJoined(msg.sender);
     }
 
-    function leave() external notAfterGameStart whenNotPaused nonReentrant {
-        refundElligble[msg.sender] = false;
+    function payEntryFee()
+        external
+        payable
+        nonReentrant
+        gameMustHaveEntryFee
+        onlyAfterJoin
+        notAfterGameStart
+    {
+        pot += entryFee;
+        refundElligble[msg.sender] = true;
+        if (token.isETH()) {
+            if (msg.value < entryFee) revert NotEnoughEther();
+        } else if (token.isUSDC()) {
+            IERC20(USDC).transferFrom(msg.sender, address(this), entryFee);
+        }
+    }
+
+    function leave() external onlyAfterJoin notAfterGameStart {
+        delete isPlayer[msg.sender];
         for (uint256 i = 0; i < players.length; i++) {
             if (players[i] == msg.sender) {
+                if (host == msg.sender) {
+                    host = (
+                        players.length > 1
+                            ? players[players.length - 1]
+                            : address(0)
+                    );
+                }
                 if (i < players.length - 1) {
                     players[i] = players[players.length - 1];
-                    if (host == msg.sender) {
-                        host = players[i];
-                    }
                 }
                 players.pop();
-                if (entryFee > 0) {
-                    if (token.isETH()) {
-                        (bool refundSentSuccessfully, ) = payable(msg.sender)
-                            .call{value: entryFee}("");
-                        if (!refundSentSuccessfully) {
-                            revert RefundTransferError();
-                        }
-                    } else if (token.isUSDC()) {
-                        bool transferSuccess = IERC20(USDC).transfer(
-                            msg.sender,
-                            entryFee
-                        );
-                        if (!transferSuccess)
-                            revert USDCTransferError(msg.sender);
-                    }
-                }
                 emit PlayerLeft(msg.sender);
                 if (players.length == 0) {
-                    host = address(0);
                     startable = false;
                     gameEnded = true;
                     emit GameClosed();
                 }
-                return;
+                break;
             }
         }
-        revert NotInGame();
     }
 
-    function startGame() external notAfterGameStart onlyHost whenNotPaused {
+    function withdrawRefund()
+        external
+        nonReentrant
+        gameMustHaveEntryFee
+        mustBeElligbleForRefund
+    {
+        delete refundElligble[msg.sender];
+        pot -= entryFee;
+        if (token.isETH()) {
+            (bool refund, ) = payable(msg.sender).call{value: entryFee}("");
+            if (!refund) revert RefundTransferError();
+        } else if (token.isUSDC()) {
+            IERC20(USDC).transfer(msg.sender, entryFee);
+        }
+    }
+
+    function withdrawWinnings()
+        external
+        nonReentrant
+        gameMustHaveEntryFee
+        onlyAfterGameOver
+        onlyWinner
+    {
+        uint256 fee = (pot * FEE_BASIS_POINTS) / FEE_DENOMINATOR;
+        uint256 winnings = pot - fee;
+
+        if (token.isETH()) {
+            (bool sent, ) = payable(msg.sender).call{value: winnings}("");
+            if (!sent) {
+                revert WinnerTransferError();
+            }
+        } else if (token.isUSDC()) {
+            IERC20(USDC).transfer(msg.sender, entryFee);
+        }
+    }
+
+    function startGame() external nonReentrant onlyHost notAfterGameStart {
+        if (players.length < 2) revert NotEnoughPlayers();
         startable = false;
         emit GameStarted();
     }
@@ -332,7 +318,6 @@ contract FarkleGameImpl is
         onlyCurrentPlayer
         notBeforeGameStart
         notAfterGameOver
-        whenNotPaused
     {
         if (dice.availableCount == 0) revert NoDiceAvailable();
 
@@ -361,8 +346,9 @@ contract FarkleGameImpl is
         uint256[] calldata randomWords
     ) internal virtual override {
         address player = s_requestToPlayer[requestId];
-        require(player != address(0), "Request not found");
-        s_rollInProgress[player] = false;
+        if (player == address(0)) revert VRFRequestNotFound();
+        delete s_rollInProgress[player];
+        delete s_requestToPlayer[requestId];
         uint256 randomValue = randomWords[0];
         uint8[6] memory newValues = _unpackDiceValues(dice.values);
 
@@ -389,7 +375,6 @@ contract FarkleGameImpl is
         onlyCurrentPlayer
         notBeforeGameStart
         notAfterGameOver
-        whenNotPaused
         returns (uint256)
     {
         if (!dice.hasRolled) revert MustRollFirst();
@@ -440,7 +425,6 @@ contract FarkleGameImpl is
         onlyCurrentPlayer
         notBeforeGameStart
         notAfterGameOver
-        whenNotPaused
         nonReentrant
     {
         if (!dice.hasRolled) revert MustRollAtLeastOnce();
@@ -634,24 +618,24 @@ contract FarkleGameImpl is
         }
     }
 
-    function _endGame() internal {
-        gameEnded = true;
-
+    function _endGame() internal nonReentrant {
         uint256 highestScore = 0;
         for (uint256 i = 0; i < players.length; i++) {
             address player = players[i];
+            delete refundElligble[player];
             uint256 score = playerScores[player];
             if (score > highestScore) {
                 highestScore = score;
                 winner = player;
             }
-            refundElligble[player] = false;
         }
+        gameEnded = true;
+        emit GameOver(winner, highestScore);
 
         uint256 fee;
         uint256 winnings;
-        if (entryFee > 0) {
-            fee = (pot * feeBasisPoints) / FEE_DENOMINATOR;
+        if (pot > 0) {
+            fee = (pot * FEE_BASIS_POINTS) / FEE_DENOMINATOR;
             winnings = pot - fee;
         }
 
@@ -668,36 +652,15 @@ contract FarkleGameImpl is
             });
         }
 
-        if (entryFee > 0) {
-            bool feeCollected;
-            bool sentWinnings;
+        LEADERBOARD.update(results, token, pot);
+        if (pot > 0) {
             if (token.isETH()) {
-                (feeCollected, ) = payable(TREASURY).call{value: fee}("");
-                if (!feeCollected) {
-                    revert FeeTransferError();
-                }
-
-                (sentWinnings, ) = payable(winner).call{value: winnings}("");
-                if (!sentWinnings) {
-                    revert WinnerTransferError();
-                }
-            }
-
-            if (token.isUSDC()) {
-                feeCollected = IERC20(USDC).transfer(TREASURY, fee);
-                if (!feeCollected) {
-                    revert USDCTransferError(TREASURY);
-                }
-
-                sentWinnings = IERC20(USDC).transfer(winner, winnings);
-                if (!sentWinnings) {
-                    revert USDCTransferError(winner);
-                }
+                (bool sent, ) = payable(TREASURY).call{value: fee}("");
+                if (!sent) revert FeeTransferError();
+            } else if (token.isUSDC()) {
+                IERC20(USDC).transfer(TREASURY, fee);
             }
         }
-
-        LEADERBOARD.update(results, token, pot);
-        emit GameOver(winner, highestScore);
     }
 
     function _packDiceValues(

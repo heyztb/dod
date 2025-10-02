@@ -8,7 +8,7 @@ import {SupportedTokens} from "src/library/Token.sol";
 interface IFarkleGame {
     function initialize(SupportedTokens.Token token, uint256 entryFee) external;
 
-    function join() external payable;
+    function join() external;
 
     function leave() external;
 
