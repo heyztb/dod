@@ -9,7 +9,7 @@ import RulesModal from "@/components/RulesModal";
 import UserDrawer from "@/components/UserDrawer";
 import FinishedGamesList from "@/components/FinishedGamesList";
 
-const client = hcWithType("/");
+const client = hcWithType("/api");
 export const Route = createFileRoute("/")({
   component: Index,
 });
