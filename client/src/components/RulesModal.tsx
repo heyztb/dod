@@ -41,7 +41,7 @@ export default function RulesModal() {
           <ul className="list-disc space-y-1 pl-5 text-sm text-gray-700 dark:text-gray-300">
             <li>Single 1 = 10 points</li>
             <li>Single 5 = 5 points</li>
-            <li>Three 1s = 1,00 points</li>
+            <li>Three 1s = 100 points</li>
             <li>Three of a kind (2-6) = 10 × number</li>
             <li>Four of a kind = 100 points</li>
             <li>Five of a kind = 200 points</li>
