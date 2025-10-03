@@ -36,7 +36,7 @@ contract FarkleGameFactoryTest is Test {
 
     function setUp() public {
         // Fork Base mainnet for real USDC testing
-        vm.createSelectFork(vm.envString("BASE_RPC_URL"));
+        vm.createSelectFork("base");
 
         // Deploy implementation
         implementation = new FarkleGameImpl(VRF_COORDINATOR);
