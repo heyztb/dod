@@ -2,10 +2,6 @@ on: [push]
 
 name: forge test
 
-defaults:
-  run:
-    working-directory: contracts
-
 jobs:
   check:
     name: Foundry project
@@ -18,10 +14,24 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
+      - name: Debug directory contents
+        working-directory: contracts
+        run: |
+          echo "=== PWD ==="
+          pwd
+          echo "=== Directory contents ==="
+          ls -la
+          echo "=== Test directory ==="
+          ls -la test/ || echo "No test directory"
+          echo "=== Lib directory ==="
+          ls -la lib/ || echo "No lib directory"
+
       - name: Install dependencies
+        working-directory: contracts
         run: forge install
 
       - name: Run tests
+        working-directory: contracts
         run: forge test -vvv
 
       - name: Run snapshot
