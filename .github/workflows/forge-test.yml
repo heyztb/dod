@@ -4,7 +4,7 @@ name: forge test
 
 defaults:
   run:
-    working-directory: $GITHUB_WORKSPACE/contracts
+    working-directory: contracts
 
 jobs:
   check:
