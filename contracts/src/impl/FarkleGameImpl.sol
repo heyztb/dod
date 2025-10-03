@@ -447,31 +447,6 @@ contract FarkleGameImpl is
         _nextTurn();
     }
 
-    function _rollAvailableDice() internal view returns (uint8[6] memory) {
-        uint8[6] memory values = _unpackDiceValues(dice.values);
-        uint256 seed = uint256(
-            keccak256(
-                abi.encodePacked(
-                    block.timestamp,
-                    block.prevrandao,
-                    msg.sender,
-                    dice.turnScore
-                )
-            )
-        );
-
-        // Only roll unselected dice
-        for (uint256 i = 0; i < 6; i++) {
-            if ((dice.selectedMask & (1 << i)) == 0) {
-                // This die is not selected, roll it
-                values[i] = uint8((seed >> (i * 8)) % 6) + 1;
-            }
-            // Selected dice keep their existing values
-        }
-
-        return values;
-    }
-
     function _calculateSelectionScore(
         uint8[] calldata indices,
         uint8[6] memory values
