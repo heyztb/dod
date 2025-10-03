@@ -12,7 +12,7 @@ jobs:
           submodules: recursive
 
       - name: Change directory
-        run: cd contracts
+        run: cd $GITHUB_WORKSPACE/contracts
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
