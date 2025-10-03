@@ -31,6 +31,8 @@ jobs:
         run: forge install
 
       - name: Run tests
+        env:
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
         working-directory: contracts
         run: forge test -vvv
 
