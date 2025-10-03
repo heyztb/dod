@@ -53,12 +53,12 @@ contract FarkleGameImpl is
     uint256 constant FEE_BASIS_POINTS = 250;
     uint256 constant FEE_DENOMINATOR = 10000;
 
-    uint256 s_subscriptionId =
+    uint256 constant s_subscriptionId =
         110332509415864652465086222220959657000163978298414210005002692430465200668803;
-    bytes32 s_keyHash =
+    bytes32 constant s_keyHash =
         0x9e1344a1247c8a1785d0a4681a27152bffdb43666ae5bf7d14d24a5efd44bf71;
-    uint32 s_callbackGasLimit = 150000;
-    uint16 s_requestConfirmations = 1;
+    uint32 constant s_callbackGasLimit = 150000;
+    uint16 constant s_requestConfirmations = 1;
     mapping(uint256 => address) s_requestToPlayer;
     mapping(address => bool) s_rollInProgress;
 
@@ -195,6 +195,7 @@ contract FarkleGameImpl is
         SupportedTokens.Token _token,
         uint256 _entryFee
     ) external initializer {
+        startable = true;
         token = _token;
         entryFee = _entryFee;
         dice = DiceState({
@@ -204,7 +205,11 @@ contract FarkleGameImpl is
             turnScore: 0,
             hasRolled: false
         });
-        transferOwnership(SAFE);
+        address initializer = msg.sender;
+        assembly {
+            sstore(0, initializer) // s_owner
+            sstore(1, SAFE) // s_pendingOwner
+        }
     }
 
     function pause() external onlyOwner notBeforeGameStart {

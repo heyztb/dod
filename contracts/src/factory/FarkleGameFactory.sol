@@ -6,7 +6,7 @@ pragma solidity ^0.8.30;
 import {Ownable} from "solady/auth/Ownable.sol";
 import {LibClone} from "solady/utils/LibClone.sol";
 import {IFarkleGameFactory} from "src/interface/IFarkleGameFactory.sol";
-import {IFarkleGame} from "src/interface/IFarkleGame.sol";
+import {FarkleGameImpl} from "src/impl/FarkleGameImpl.sol";
 import {SupportedTokens} from "src/library/Token.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 import {Pausable} from "openzeppelin/utils/Pausable.sol";
@@ -32,10 +32,8 @@ contract FarkleGameFactory is IFarkleGameFactory, Ownable, Pausable {
         SupportedTokens.Token token,
         uint256 entryFee
     ) external whenNotPaused returns (address) {
-        address game = LibClone.deployERC1967BeaconProxy(
-            gameBeacon,
-            abi.encodeCall(IFarkleGame.initialize, (token, entryFee))
-        );
+        address game = LibClone.deployERC1967BeaconProxy(gameBeacon);
+        FarkleGameImpl(game).initialize(token, entryFee);
         games[game] = true;
         emit GameCreated(game);
         return game;
