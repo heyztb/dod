@@ -14,6 +14,7 @@ import {FarkleLeaderboard} from "../src/impl/FarkleLeaderboardImpl.sol";
 contract DeployAll is Script {
     function run(address vrfCoordinator) external {
         require(vrfCoordinator != address(0), "vrfCoordinator required");
+        address safe = 0x6052F75B3FbDd4A89d6a0E4Be7119Db18ea20a35;
 
         vm.startBroadcast();
 
@@ -21,7 +22,7 @@ contract DeployAll is Script {
         FarkleGameImpl gameImpl = new FarkleGameImpl(vrfCoordinator);
         console.log("FarkleGameImpl deployed at:", address(gameImpl));
         address gameBeacon = deployBeacon(
-            msg.sender,
+            safe,
             address(gameImpl),
             "FarkleGameBeacon"
         );
