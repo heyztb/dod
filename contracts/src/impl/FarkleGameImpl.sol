@@ -10,10 +10,12 @@ import {SupportedTokens} from "src/library/Token.sol";
 import {VRFConsumerBaseV2Plus} from "chainlink/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "chainlink/vrf/dev/libraries/VRFV2PlusClient.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
+import {SafeERC20} from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import {Pausable} from "openzeppelin/utils/Pausable.sol";
 import {ReentrancyGuard} from "openzeppelin/utils/ReentrancyGuard.sol";
 
 using SupportedTokens for SupportedTokens.Token;
+using SafeERC20 for IERC20;
 
 contract FarkleGameImpl is
     IFarkleGame,
@@ -205,9 +207,9 @@ contract FarkleGameImpl is
             turnScore: 0,
             hasRolled: false
         });
-        address initializer = msg.sender;
+        address factory = msg.sender;
         assembly {
-            sstore(0, initializer) // s_owner
+            sstore(0, factory) // s_owner
             sstore(1, SAFE) // s_pendingOwner
         }
     }
@@ -247,7 +249,7 @@ contract FarkleGameImpl is
         if (token.isETH()) {
             if (msg.value < entryFee) revert NotEnoughEther();
         } else if (token.isUSDC()) {
-            IERC20(USDC).transferFrom(msg.sender, address(this), entryFee);
+            IERC20(USDC).safeTransferFrom(msg.sender, address(this), entryFee);
         }
     }
 
@@ -289,7 +291,7 @@ contract FarkleGameImpl is
             (bool refund, ) = payable(msg.sender).call{value: entryFee}("");
             if (!refund) revert RefundTransferError();
         } else if (token.isUSDC()) {
-            IERC20(USDC).transfer(msg.sender, entryFee);
+            IERC20(USDC).safeTransfer(msg.sender, entryFee);
         }
     }
 
@@ -309,7 +311,7 @@ contract FarkleGameImpl is
                 revert WinnerTransferError();
             }
         } else if (token.isUSDC()) {
-            IERC20(USDC).transfer(msg.sender, winnings);
+            IERC20(USDC).safeTransfer(msg.sender, winnings);
         }
     }
 
@@ -330,6 +332,7 @@ contract FarkleGameImpl is
 
         if (s_rollInProgress[msg.sender]) revert RollInProgress();
         s_rollInProgress[msg.sender] = true;
+        emit DiceThrown(msg.sender);
 
         uint256 requestId = s_vrfCoordinator.requestRandomWords(
             VRFV2PlusClient.RandomWordsRequest({
@@ -345,7 +348,6 @@ contract FarkleGameImpl is
         );
 
         s_requestToPlayer[requestId] = msg.sender;
-        emit DiceThrown(msg.sender);
     }
 
     function fulfillRandomWords(
@@ -457,7 +459,7 @@ contract FarkleGameImpl is
         uint8[6] memory values
     ) internal pure returns (uint256) {
         // Count frequencies of selected dice values
-        uint8[7] memory counts; // index 0 unused, 1-6 for die values
+        uint8[7] memory counts = [0, 0, 0, 0, 0, 0, 0]; // index 0 unused, 1-6 for die values
 
         for (uint256 i = 0; i < indices.length; i++) {
             uint8 value = values[indices[i]];
@@ -559,7 +561,7 @@ contract FarkleGameImpl is
 
     function _hasAnyScore(uint8[6] memory values) internal view returns (bool) {
         // Check only the newly rolled dice (unselected ones)
-        uint8[7] memory counts;
+        uint8[7] memory counts = [0, 0, 0, 0, 0, 0, 0]; // index 0 unused, 1-6 for die values
         uint8 newDiceCount = 0;
 
         for (uint256 i = 0; i < 6; i++) {
@@ -602,7 +604,8 @@ contract FarkleGameImpl is
 
     function _endGame() internal {
         uint256 highestScore = 0;
-        for (uint256 i = 0; i < players.length; i++) {
+        uint256 len = players.length;
+        for (uint256 i = 0; i < len; i++) {
             address player = players[i];
             delete refundElligble[player];
             uint256 score = playerScores[player];
@@ -614,15 +617,15 @@ contract FarkleGameImpl is
         gameEnded = true;
         emit GameOver(winner, highestScore);
 
-        uint256 fee;
-        uint256 winnings;
+        uint256 fee = 0;
+        uint256 winnings = 0;
         if (pot > 0) {
             fee = (pot * FEE_BASIS_POINTS) / FEE_DENOMINATOR;
             winnings = pot - fee;
         }
 
-        PlayerResult[] memory results = new PlayerResult[](players.length);
-        for (uint256 i = 0; i < players.length; i++) {
+        PlayerResult[] memory results = new PlayerResult[](len);
+        for (uint256 i = 0; i < len; i++) {
             address player = players[i];
             results[i] = PlayerResult({
                 player: player,
@@ -640,7 +643,7 @@ contract FarkleGameImpl is
                 (bool sent, ) = payable(TREASURY).call{value: fee}("");
                 if (!sent) revert FeeTransferError();
             } else if (token.isUSDC()) {
-                IERC20(USDC).transfer(TREASURY, fee);
+                IERC20(USDC).safeTransfer(TREASURY, fee);
             }
         }
     }
@@ -658,7 +661,7 @@ contract FarkleGameImpl is
     function _unpackDiceValues(
         uint48 packed
     ) internal pure returns (uint8[6] memory) {
-        uint8[6] memory values;
+        uint8[6] memory values = [0, 0, 0, 0, 0, 0];
         for (uint8 i = 0; i < 6; i++) {
             values[i] = uint8(((packed >> (i * 8)) & 0xFF) + 1);
         }
