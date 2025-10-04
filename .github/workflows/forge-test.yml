@@ -1,10 +1,10 @@
 on: [push]
 
-name: forge test
+name: Smart contract tests
 
 jobs:
   check:
-    name: Foundry project
+    name: Run smart contract tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
