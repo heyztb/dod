@@ -1,4 +1,8 @@
-on: [push]
+on:
+  push:
+    paths:
+      - "contracts/src/**"
+      - "contracts/test/**"
 
 name: Smart contract tests
 
