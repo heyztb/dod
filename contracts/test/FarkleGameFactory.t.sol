@@ -19,8 +19,7 @@ contract FarkleGameFactoryTest is Test {
     FarkleGameImpl public implementation;
     address public beacon;
 
-    address constant VRF_COORDINATOR =
-        0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634; // Base mainnet
+    address constant VRF_COORDINATOR = 0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634; // Base mainnet
     address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913; // Base mainnet
     address constant SAFE = 0x6052F75B3FbDd4A89d6a0E4Be7119Db18ea20a35;
 
@@ -42,16 +41,10 @@ contract FarkleGameFactoryTest is Test {
         implementation = new FarkleGameImpl(VRF_COORDINATOR);
 
         // Deploy beacon with owner and implementation
-        bytes memory creationCode = abi.encodePacked(
-            BEACON_BYTECODE,
-            abi.encode(beaconOwner, address(implementation))
-        );
+        bytes memory creationCode = abi.encodePacked(BEACON_BYTECODE, abi.encode(beaconOwner, address(implementation)));
 
         assembly {
-            sstore(
-                beacon.slot,
-                create(0, add(creationCode, 0x20), mload(creationCode))
-            )
+            sstore(beacon.slot, create(0, add(creationCode, 0x20), mload(creationCode)))
         }
         require(beacon != address(0), "Beacon deployment failed");
 
@@ -76,104 +69,58 @@ contract FarkleGameFactoryTest is Test {
     // ============ Game Creation Tests ============
 
     function test_CreateGame() public {
-        address game = factory.createGame(
-            SupportedTokens.Token.USDC,
-            ENTRY_FEE
-        );
+        address game = factory.createGame(SupportedTokens.Token.USDC, ENTRY_FEE);
 
         assertTrue(game != address(0), "Game address should not be zero");
-        assertTrue(
-            factory.isGame(game),
-            "Game should be registered in factory"
-        );
+        assertTrue(factory.isGame(game), "Game should be registered in factory");
     }
 
     function test_CreateGame_InitializationValues() public {
-        address game = factory.createGame(
-            SupportedTokens.Token.USDC,
-            ENTRY_FEE
-        );
+        address game = factory.createGame(SupportedTokens.Token.USDC, ENTRY_FEE);
 
         FarkleGameImpl gameImpl = FarkleGameImpl(payable(game));
 
         // Check initialization values
-        assertEq(
-            uint(gameImpl.token()),
-            uint(SupportedTokens.Token.USDC),
-            "Token should be USDC"
-        );
+        assertEq(uint256(gameImpl.token()), uint256(SupportedTokens.Token.USDC), "Token should be USDC");
         assertEq(gameImpl.entryFee(), ENTRY_FEE, "Entry fee should match");
         assertTrue(gameImpl.startable(), "Game should be startable");
-        assertEq(
-            gameImpl.getAvailableCount(),
-            6,
-            "Should have 6 available dice"
-        );
+        assertEq(gameImpl.getAvailableCount(), 6, "Should have 6 available dice");
     }
 
     function test_CreateGame_OwnershipTransfer() public {
-        address game = factory.createGame(
-            SupportedTokens.Token.USDC,
-            ENTRY_FEE
-        );
+        address game = factory.createGame(SupportedTokens.Token.USDC, ENTRY_FEE);
 
         FarkleGameImpl gameImpl = FarkleGameImpl(payable(game));
-        console2.log(
-            "Game owner before SAFE accepts ownership",
-            gameImpl.owner()
-        );
+        console2.log("Game owner before SAFE accepts ownership", gameImpl.owner());
         vm.prank(SAFE);
         gameImpl.acceptOwnership();
 
-        console2.log(
-            "Game owner after SAFE accepts ownership:",
-            gameImpl.owner()
-        );
+        console2.log("Game owner after SAFE accepts ownership:", gameImpl.owner());
         console2.log("Expected owner (SAFE):", SAFE);
 
         // This is the critical test - verify ownership was properly transferred to SAFE
-        assertEq(
-            gameImpl.owner(),
-            SAFE,
-            "Game owner should be SAFE after initialization"
-        );
+        assertEq(gameImpl.owner(), SAFE, "Game owner should be SAFE after initialization");
     }
 
     function test_CreateGame_MultipleGames() public {
-        address game1 = factory.createGame(
-            SupportedTokens.Token.USDC,
-            ENTRY_FEE
-        );
-        address game2 = factory.createGame(
-            SupportedTokens.Token.ETH,
-            0.01 ether
-        );
+        address game1 = factory.createGame(SupportedTokens.Token.USDC, ENTRY_FEE);
+        address game2 = factory.createGame(SupportedTokens.Token.ETH, 0.01 ether);
         address game3 = factory.createGame(SupportedTokens.Token.USDC, 0);
 
         assertTrue(factory.isGame(game1), "Game 1 should be registered");
         assertTrue(factory.isGame(game2), "Game 2 should be registered");
         assertTrue(factory.isGame(game3), "Game 3 should be registered");
 
-        assertTrue(
-            game1 != game2 && game2 != game3 && game1 != game3,
-            "All games should have unique addresses"
-        );
+        assertTrue(game1 != game2 && game2 != game3 && game1 != game3, "All games should have unique addresses");
     }
 
     function test_CreateGame_ETHGame() public {
         uint256 ethEntryFee = 0.01 ether;
-        address game = factory.createGame(
-            SupportedTokens.Token.ETH,
-            ethEntryFee
-        );
+        address game = factory.createGame(SupportedTokens.Token.ETH, ethEntryFee);
 
         FarkleGameImpl gameImpl = FarkleGameImpl(payable(game));
 
-        assertEq(
-            uint(gameImpl.token()),
-            uint(SupportedTokens.Token.ETH),
-            "Token should be ETH"
-        );
+        assertEq(uint256(gameImpl.token()), uint256(SupportedTokens.Token.ETH), "Token should be ETH");
         assertEq(gameImpl.entryFee(), ethEntryFee, "Entry fee should match");
     }
 
@@ -193,10 +140,7 @@ contract FarkleGameFactoryTest is Test {
     // ============ Game Functionality After Creation Tests ============
 
     function test_CreatedGame_CanJoin() public {
-        address game = factory.createGame(
-            SupportedTokens.Token.USDC,
-            ENTRY_FEE
-        );
+        address game = factory.createGame(SupportedTokens.Token.USDC, ENTRY_FEE);
 
         FarkleGameImpl gameImpl = FarkleGameImpl(payable(game));
 
@@ -204,11 +148,7 @@ contract FarkleGameFactoryTest is Test {
         gameImpl.join();
 
         assertEq(gameImpl.host(), user1, "User1 should be the host");
-        assertEq(
-            gameImpl.players(0),
-            user1,
-            "User1 should be in players array"
-        );
+        assertEq(gameImpl.players(0), user1, "User1 should be in players array");
     }
 
     function test_CreatedGame_SafeCanPauseAfterAcceptingOwnership() public {
@@ -277,26 +217,17 @@ contract FarkleGameFactoryTest is Test {
     // ============ isGame Tests ============
 
     function test_IsGame_ReturnsTrueForCreatedGames() public {
-        address game = factory.createGame(
-            SupportedTokens.Token.USDC,
-            ENTRY_FEE
-        );
+        address game = factory.createGame(SupportedTokens.Token.USDC, ENTRY_FEE);
         assertTrue(factory.isGame(game), "Should return true for created game");
     }
 
     function test_IsGame_ReturnsFalseForRandomAddress() public {
         address randomAddress = makeAddr("random");
-        assertFalse(
-            factory.isGame(randomAddress),
-            "Should return false for random address"
-        );
+        assertFalse(factory.isGame(randomAddress), "Should return false for random address");
     }
 
     function test_IsGame_ReturnsFalseForFactory() public view {
-        assertFalse(
-            factory.isGame(address(factory)),
-            "Should return false for factory itself"
-        );
+        assertFalse(factory.isGame(address(factory)), "Should return false for factory itself");
     }
 
     // ============ Integration Tests ============
@@ -317,10 +248,7 @@ contract FarkleGameFactoryTest is Test {
         gameImpl.startGame();
 
         // Verify game started
-        assertFalse(
-            gameImpl.startable(),
-            "Game should not be startable after start"
-        );
+        assertFalse(gameImpl.startable(), "Game should not be startable after start");
         assertEq(gameImpl.currentPlayer(), 0, "Current player should be 0");
     }
 
@@ -354,10 +282,7 @@ contract FarkleGameFactoryTest is Test {
     // ============ Ownership Assumption Validation Tests ============
 
     function test_OwnershipAssumption_InitializerSlotSetCorrectly() public {
-        address game = factory.createGame(
-            SupportedTokens.Token.USDC,
-            ENTRY_FEE
-        );
+        address game = factory.createGame(SupportedTokens.Token.USDC, ENTRY_FEE);
 
         // Read storage slot 0 (where we set the initializer in assembly)
         bytes32 slot0 = vm.load(game, bytes32(uint256(0)));
@@ -368,18 +293,11 @@ contract FarkleGameFactoryTest is Test {
         console2.log("Current owner:", FarkleGameImpl(payable(game)).owner());
 
         // The initializer should have been the factory
-        assertEq(
-            storedInitializer,
-            address(factory),
-            "Slot 0 should contain factory address"
-        );
+        assertEq(storedInitializer, address(factory), "Slot 0 should contain factory address");
     }
 
     function test_OwnershipAssumption_PendingOwnerSetCorrectly() public {
-        address game = factory.createGame(
-            SupportedTokens.Token.USDC,
-            ENTRY_FEE
-        );
+        address game = factory.createGame(SupportedTokens.Token.USDC, ENTRY_FEE);
 
         // Read storage slot 1 (where we set the pending owner in assembly)
         bytes32 slot1 = vm.load(game, bytes32(uint256(1)));
@@ -390,10 +308,6 @@ contract FarkleGameFactoryTest is Test {
         console2.log("Current owner:", FarkleGameImpl(payable(game)).owner());
 
         // The pending owner should have been the SAFE
-        assertEq(
-            storedPendingOwner,
-            SAFE,
-            "Slot 1 should contain SAFE address"
-        );
+        assertEq(storedPendingOwner, SAFE, "Slot 1 should contain SAFE address");
     }
 }

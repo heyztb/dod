@@ -28,10 +28,7 @@ contract FarkleGameFactory is IFarkleGameFactory, Ownable, Pausable {
         gameBeacon = _gameBeacon;
     }
 
-    function createGame(
-        SupportedTokens.Token token,
-        uint256 entryFee
-    ) external whenNotPaused returns (address) {
+    function createGame(SupportedTokens.Token token, uint256 entryFee) external whenNotPaused returns (address) {
         address game = LibClone.deployERC1967BeaconProxy(gameBeacon);
         FarkleGameImpl(game).initialize(token, entryFee);
         games[game] = true;

@@ -28,14 +28,7 @@ struct PlayerResult {
 }
 
 interface IFarkleLeaderboard {
-    event LeaderboardUpdated(
-        SupportedTokens.Token token,
-        PlayerResult[] results
-    );
+    event LeaderboardUpdated(SupportedTokens.Token token, PlayerResult[] results);
 
-    function update(
-        PlayerResult[] calldata results,
-        SupportedTokens.Token token,
-        uint256 pot
-    ) external;
+    function update(PlayerResult[] calldata results, SupportedTokens.Token token, uint256 pot) external;
 }

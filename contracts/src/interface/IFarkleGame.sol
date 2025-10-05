@@ -10,7 +10,13 @@ interface IFarkleGame {
 
     function join() external;
 
+    function payEntryFee() external payable;
+
     function leave() external;
+
+    function withdrawRefund() external;
+
+    function withdrawWinnings() external;
 
     function startGame() external;
 
@@ -21,4 +27,12 @@ interface IFarkleGame {
     ) external returns (uint256);
 
     function bank() external;
+
+    function getCurrentDiceValues() external view returns (uint8[6] memory);
+
+    function getSelectedMask() external view returns (uint8);
+
+    function getTurnScore() external view returns (uint32);
+
+    function getAvailableCount() external view returns (uint8);
 }

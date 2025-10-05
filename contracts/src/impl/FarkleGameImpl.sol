@@ -249,6 +249,7 @@ contract FarkleGameImpl is
         if (token.isETH()) {
             if (msg.value < entryFee) revert NotEnoughEther();
         } else if (token.isUSDC()) {
+            if (msg.value != 0) revert WantUSDCNotETH();
             IERC20(USDC).safeTransferFrom(msg.sender, address(this), entryFee);
         }
     }
@@ -394,8 +395,9 @@ contract FarkleGameImpl is
         for (uint256 i = 0; i < selectedIndices.length; i++) {
             uint8 index = selectedIndices[i];
             if (index >= 6) revert InvalidSelection();
-            if ((dice.selectedMask & (1 << index)) != 0)
+            if ((dice.selectedMask & (1 << index)) != 0) {
                 revert DiceAlreadySelected();
+            }
         }
 
         // Calculate score for this selection
