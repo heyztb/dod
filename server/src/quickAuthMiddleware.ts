@@ -4,12 +4,15 @@ import { HTTPException } from "hono/http-exception";
 import { db } from "./db";
 import { usersTable } from "./db/schema";
 import { eq } from "drizzle-orm";
+import { type NeynarUserData } from "shared/src/types";
 
 const client = createClient();
 export const quickAuthMiddleware = createMiddleware<{
   Variables: {
     user: {
       fid: number;
+      username: string;
+      pfpUrl: string;
       primaryAddress?: string;
     };
   };
@@ -28,18 +31,28 @@ export const quickAuthMiddleware = createMiddleware<{
     const dbUser = await db.query.usersTable.findFirst({
       where: eq(usersTable.fid, payload.sub),
     });
+
     if (dbUser) {
       c.set("user", {
         fid: dbUser.fid,
+        username: dbUser.username!,
+        pfpUrl: dbUser.pfpUrl!,
         primaryAddress: dbUser.primaryAddress!,
       });
     } else {
       const user = await resolveUser(payload.sub);
       await db.insert(usersTable).values({
         fid: user.fid,
-        primaryAddress: user.primaryAddress,
+        username: user.username,
+        pfpUrl: user.pfp_url,
+        primaryAddress: user.verified_addresses.primary.eth_address,
       });
-      c.set("user", user);
+      c.set("user", {
+        fid: user.fid,
+        username: user.username,
+        pfpUrl: user.pfp_url,
+        primaryAddress: user.verified_addresses.primary.eth_address,
+      });
     }
   } catch (e) {
     if (e instanceof Errors.InvalidTokenError) {
@@ -53,30 +66,26 @@ export const quickAuthMiddleware = createMiddleware<{
   await next();
 });
 
-type FarcasterPrimaryAddressAPIResponse = {
-  result: {
-    address: {
-      fid: number;
-      protocol: "ethereum" | "solana";
-      address: string;
-    };
-  };
-};
-
 async function resolveUser(fid: number) {
-  const primaryAddress = await (async () => {
+  const userData = await (async () => {
     const res = await fetch(
-      `https://api.farcaster.xyz/fc/primary-address?fid=${fid}&protocol=ethereum`
+      `https://api.neynar.com/v2/farcaster/user/bulk/?fids=${fid}`,
+      {
+        headers: {
+          "x-api-key": process.env.NEYNAR_API_KEY!,
+          "x-neynar-experimental": "false",
+        },
+      }
     );
     if (res.ok) {
-      const { result } =
-        (await res.json()) as FarcasterPrimaryAddressAPIResponse;
-      return result.address.address;
+      const { users } = (await res.json()) as NeynarUserData;
+      return users[0];
     }
   })();
 
-  return {
-    fid,
-    primaryAddress,
-  };
+  if (!userData) {
+    throw new HTTPException(404, { message: "User not found" });
+  }
+
+  return userData;
 }
