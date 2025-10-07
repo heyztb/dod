@@ -36,13 +36,8 @@ contract Deploy is Script {
         console.log("FarkleGameFactory deployed at:", address(factory));
 
         // 5) Deploy leaderboard impl + proxy (initialize with factory)
-        FarkleLeaderboard leaderboardImpl = new FarkleLeaderboard();
-        console.log("FarkleLeaderboard impl at:", address(leaderboardImpl));
-        address leaderboardProxy = LibClone.deployERC1967(
-            address(leaderboardImpl),
-            abi.encodeCall(FarkleLeaderboard.initialize, (address(factory)))
-        );
-        console.log("FarkleLeaderboard proxy at:", leaderboardProxy);
+        FarkleLeaderboard leaderboard = new FarkleLeaderboard(address(factory));
+        console.log("FarkleLeaderboard impl at:", address(leaderboard));
 
         vm.stopBroadcast();
     }
