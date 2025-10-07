@@ -7,7 +7,6 @@ import {IFarkleGame} from "src/interface/IFarkleGame.sol";
 import {SupportedTokens} from "src/library/Token.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 import {LibClone} from "solady/utils/LibClone.sol";
-import {VRFCoordinatorV2_5Mock} from "chainlink/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
 
 interface IBeacon {
     function implementation() external view returns (address);
@@ -44,10 +43,6 @@ contract FarkleGameImplTest is Test {
 
     uint256 constant ENTRY_FEE = 10e6; // 10 USDC
 
-    VRFCoordinatorV2_5Mock public vrfCoordinator =
-        new VRFCoordinatorV2_5Mock(0, 0, 0);
-    uint64 subscriptionId = vrfCoordinator.createSubscription();
-
     function setUp() public {
         vm.createSelectFork("base");
 
@@ -70,8 +65,6 @@ contract FarkleGameImplTest is Test {
             payable(LibClone.deployERC1967BeaconProxy(beacon))
         );
         game.initialize(SupportedTokens.Token.USDC, ENTRY_FEE);
-        vrfCoordinator.fundSubscription(subscriptionId, 1 ether);
-        vrfCoordinator.addConsumer(game);
 
         // Give players USDC
         deal(USDC, player1, 1000e6);
