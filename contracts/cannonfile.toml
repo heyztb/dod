@@ -1,0 +1,48 @@
+name = "farkle-game"
+version = "1.0.0"
+description = "Farkle game deployment with beacon proxy pattern"
+
+[setting.vrfCoordinator]
+defaultValue = "0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634" # Base mainnet VRF Coordinator
+
+[setting.owner]
+defaultValue = "0x6052F75B3FbDd4A89d6a0E4Be7119Db18ea20a35" # SAFE address from your contracts
+
+# Deploy the game implementation contract
+[contract.FarkleGameImpl]
+artifact = "FarkleGameImpl"
+args = ["<%= settings.vrfCoordinator %>"]
+
+# Deploy the upgradeable beacon pointing to the implementation
+[contract.UpgradeableBeacon]
+artifact = "UpgradeableBeacon"
+args = [
+    "<%= settings.owner %>",
+    "<%= contracts.FarkleGameImpl.address %>"
+]
+
+# Deploy the leaderboard implementation
+[contract.FarkleLeaderboardImpl]
+artifact = "FarkleLeaderboard"
+args = [
+    "<%= contracts.FarkleGameFactory.address %>"
+]
+depends = ["contract.FarkleGameFactory"]
+
+# Deploy the game factory
+[contract.FarkleGameFactory]
+artifact = "FarkleGameFactory"
+args = ["<%= contracts.UpgradeableBeacon.address %>"]
+
+# Outputs for easy reference
+[var.gameImplementation]
+value = "<%= contracts.FarkleGameImpl.address %>"
+
+[var.beacon]
+value = "<%= contracts.UpgradeableBeacon.address %>"
+
+[var.factory]
+value = "<%= contracts.FarkleGameFactory.address %>"
+
+[var.leaderboard]
+value = "<%= contracts.FarkleLeaderboardImpl.address %>"
