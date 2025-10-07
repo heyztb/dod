@@ -8,7 +8,6 @@ import {LibClone} from "solady/utils/LibClone.sol";
 import {IFarkleGameFactory} from "src/interface/IFarkleGameFactory.sol";
 import {FarkleGameImpl} from "src/impl/FarkleGameImpl.sol";
 import {SupportedTokens} from "src/library/Token.sol";
-import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 import {Pausable} from "openzeppelin/utils/Pausable.sol";
 
 using SupportedTokens for SupportedTokens.Token;
@@ -28,7 +27,10 @@ contract FarkleGameFactory is IFarkleGameFactory, Ownable, Pausable {
         gameBeacon = _gameBeacon;
     }
 
-    function createGame(SupportedTokens.Token token, uint256 entryFee) external whenNotPaused returns (address) {
+    function createGame(
+        SupportedTokens.Token token,
+        uint256 entryFee
+    ) external whenNotPaused returns (address) {
         address game = LibClone.deployERC1967BeaconProxy(gameBeacon);
         FarkleGameImpl(game).initialize(token, entryFee);
         games[game] = true;
