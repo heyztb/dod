@@ -4,15 +4,13 @@
 pragma solidity ^0.8.30;
 
 import {IFarkleLeaderboard, PlayerResult, Stats} from "src/interface/IFarkleLeaderboard.sol";
-import {Initializable} from "solady/utils/Initializable.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
-import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {IFarkleGameFactory} from "src/interface/IFarkleGameFactory.sol";
 import {SupportedTokens} from "src/library/Token.sol";
 
 using SupportedTokens for SupportedTokens.Token;
 
-contract FarkleLeaderboard is IFarkleLeaderboard, Initializable, Ownable, UUPSUpgradeable {
+contract FarkleLeaderboard is IFarkleLeaderboard, Ownable {
     mapping(address => Stats) public leaderboard;
     IFarkleGameFactory public gameFactory;
 
@@ -23,18 +21,15 @@ contract FarkleLeaderboard is IFarkleLeaderboard, Initializable, Ownable, UUPSUp
         _;
     }
 
-    constructor() {
-        _disableInitializers();
-    }
-
-    function initialize(address _gameFactory) public initializer {
-        _initializeOwner(msg.sender);
+    constructor(address _gameFactory) {
         gameFactory = IFarkleGameFactory(_gameFactory);
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
-
-    function update(PlayerResult[] calldata results, SupportedTokens.Token token, uint256 pot) external onlyGame {
+    function update(
+        PlayerResult[] calldata results,
+        SupportedTokens.Token token,
+        uint256 pot
+    ) external onlyGame {
         for (uint256 i = 0; i < results.length; i++) {
             address player = results[i].player;
             Stats storage stats = leaderboard[player];
@@ -54,7 +49,9 @@ contract FarkleLeaderboard is IFarkleLeaderboard, Initializable, Ownable, UUPSUp
                         stats.ethWagered += results[i].wager;
                         stats.ethWon += results[i].amountWon;
                     } else if (token.isUSDC()) {
-                        stats.usdcWagered = stats.usdcWagered + results[i].wager;
+                        stats.usdcWagered =
+                            stats.usdcWagered +
+                            results[i].wager;
                         stats.usdcWon += results[i].amountWon;
                     }
                 }
