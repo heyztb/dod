@@ -1,6 +1,7 @@
 name = "farkle"
 version = "1.0.0"
 description = "An onchain implementation of the dice game Farkle"
+deployers = ["0x6052F75B3FbDd4A89d6a0E4Be7119Db18ea20a35", "0x4e46f57817b3970a44aE4C32b04E80E17290e973", "0xE9821d00E727E9F87B8c18910575c0b08640e670", "0x58FEF4aA757Bd5f5a72b5613348F0B6073617865"]
 
 [setting.vrfCoordinator]
 defaultValue = "0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634" # Base mainnet VRF Coordinator
