@@ -74,17 +74,9 @@ export default function UserDrawer({ context }: UserDrawerProps) {
   return (
     <Drawer>
       <DrawerTrigger>
-        <div className="border cursor-pointer flex items-center border-neutral-300 rounded-sm w-auto p-1 bg-[#eef0f3] active:scale-95 active:animate-none transition transform duration-150">
-          <Avatar className="border border-neutral-500">
-            <AvatarImage
-              src={context?.user.pfpUrl}
-              alt={context?.user.username}
-            />
-            <AvatarFallback>
-              {context?.user.displayName?.charAt(0)}
-            </AvatarFallback>
-          </Avatar>
-        </div>
+        <button className="text-sm font-mono tracking-wider hover:underline hover:cursor-pointer transition-colors">
+          {context?.user.username?.toUpperCase()}
+        </button>
       </DrawerTrigger>
       <DrawerContent>
         <div className="px-3 pt-0 pb-4 overflow-y-auto max-h-[calc(420px-24px)]">
@@ -165,7 +157,7 @@ export default function UserDrawer({ context }: UserDrawerProps) {
             </div>
             <FundButton
               fundingUrl={onrampBuyUrl}
-              className="rounded-md cursor-pointer w-full h-10 text-sm text-white"
+              className="rounded-md cursor-pointer w-full h-10 text-md font-bold text-white bg-black"
             />
           </div>
         </div>
