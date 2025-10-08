@@ -5,7 +5,9 @@ import { base, baseSepolia } from "wagmi/chains";
 import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { OnchainKitProvider } from "@coinbase/onchainkit";
-import { HelmetProvider } from "@dr.pogodin/react-helmet";
+import { sdk } from "@farcaster/miniapp-sdk";
+import UserDrawer from "@/components/UserDrawer";
+import { Toaster } from "sonner";
 
 const config = createConfig({
   chains: [base, baseSepolia],
@@ -17,6 +19,7 @@ const config = createConfig({
 });
 
 const queryClient = new QueryClient();
+const context = await sdk.context;
 
 export const Route = createRootRoute({
   component: () => (
@@ -40,9 +43,27 @@ export const Route = createRootRoute({
             enabled: true,
           }}
         >
-          <HelmetProvider>
+          {/* Add bottom padding equal to BottomNav height so content (footer) is not covered */}
+          <div className="pb-16">
+            <header className="p-4 flex justify-between items-center">
+              <div className="text-sm font-mono tracking-wider">FARKLE</div>
+              <UserDrawer context={context} />
+            </header>
             <Outlet />
-          </HelmetProvider>
+            <Toaster position={"top-center"} duration={1250} />
+            <footer
+              className="p-4 text-center hover:underline hover:cursor-pointer"
+              onClick={() => {
+                sdk.actions.viewProfile({
+                  fid: 979284,
+                });
+              }}
+            >
+              <p className="text-xs text-muted-foreground font-mono">
+                © 2025 HEYZTB.ETH
+              </p>
+            </footer>
+          </div>
           <BottomNav />
         </OnchainKitProvider>
       </QueryClientProvider>
