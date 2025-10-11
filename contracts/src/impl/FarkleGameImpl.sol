@@ -28,10 +28,10 @@ contract FarkleGameImpl is
     uint256 public constant MAX_SCORE = 1_000;
     IFarkleLeaderboard public constant LEADERBOARD =
         IFarkleLeaderboard(address(0));
-    address public constant TREASURY =
-        0x3cF189902B4902745CE27dDc864E4a2fe7641a0c;
-    address public constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
     address public constant SAFE = 0x6052F75B3FbDd4A89d6a0E4Be7119Db18ea20a35;
+    address public constant TREASURY =
+        0x11fe6b95657238Da590590FAA50f33141402c511;
+    address public constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
     SupportedTokens.Token public token;
     uint256 public entryFee;
     uint256 public pot;
